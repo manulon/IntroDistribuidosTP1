@@ -1,19 +1,18 @@
 from socket import *
-
+from common.Socket import Socket
+       
 class Server():
     def __init__(self):
-        self.server_port = 12000
-        self.server_address = '127.0.0.1'
-        self.socket = socket(AF_INET, SOCK_DGRAM)
-        self.socket.bind(('', self.server_port))
+        self.port = 12000
+        self.address = '127.0.0.1'
+        self.socket = Socket(self.port, self.address)
 
     def receive(self):
         print('The server is ready to receive')
         while True:
-            message, clientAddress = self.socket.recvfrom(2048)
+            message, (clientAddress, clientPort) = self.socket.receive()
             modifiedMessage = message.decode().upper()
-            print('recibi un mensaje:', modifiedMessage)
-            self.socket.sendto(modifiedMessage.encode(), clientAddress)
+            self.socket.send(modifiedMessage.encode(), clientAddress, clientPort)
 
     def close(self):
         self.socket.close()
