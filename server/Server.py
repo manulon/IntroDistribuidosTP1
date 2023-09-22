@@ -2,9 +2,9 @@ from socket import *
 from common.Socket import Socket
        
 class Server():
-    def __init__(self):
-        self.port = 12000
-        self.address = '127.0.0.1'
+    def __init__(self, port, address):
+        self.port = port
+        self.address = address
         self.socket = Socket(self.port, self.address)
 
     def receive(self):

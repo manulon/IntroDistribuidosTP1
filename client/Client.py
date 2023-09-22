@@ -2,11 +2,11 @@ from socket import *
 from common.Socket import Socket
 
 class Client:
-    def __init__(self):
-        self.port = 12001
-        self.serverPort = 12000
-        self.address = '127.0.0.1'
-        self.serverAddress = '127.0.0.1'
+    def __init__(self, address, port):
+        self.port = port
+        self.serverPort = 16000
+        self.address = address
+        self.serverAddress = 'localhost'
         self.socket = Socket(self.port, self.address)
 
     def send(self):
