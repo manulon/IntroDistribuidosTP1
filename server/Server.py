@@ -2,7 +2,7 @@ from socket import *
 from common.Socket import Socket
        
 class Server():
-    def __init__(self, port, address):
+    def __init__(self, address, port):
         self.port = port
         self.address = address
         self.socket = Socket(self.port, self.address)
