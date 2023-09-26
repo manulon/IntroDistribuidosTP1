@@ -3,6 +3,7 @@ import getopt
 import os
 from client.Client import Client
 from common.constants import *
+from client.StopAndWait import *
 
 def main(argv):
     verbosity = 0  # por defecto verbose 0
@@ -74,7 +75,11 @@ def main(argv):
         return
 
     client = Client(host_service_ip_address, port_service_port)
-    client.send()
+    message = input('Input lowercase sentence:')
+    client.send(message)
+    #protocol = StopAndWait(client)
+    #protocol.upload(000000000)
+    #client.send()
     client.close()
 
 if __name__ == '__main__':

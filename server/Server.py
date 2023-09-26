@@ -1,5 +1,7 @@
 from socket import *
 from common.Socket import Socket
+from common.Packet import Packet
+from server.StopAndWait import StopAndWait
        
 class Server():
     def __init__(self, address, port):
@@ -10,9 +12,23 @@ class Server():
     def receive(self):
         print('The server is ready to receive')
         while True:
-            message, (clientAddress, clientPort) = self.socket.receive()
-            modifiedMessage = message.decode().upper()
-            self.socket.send(modifiedMessage.encode(), clientAddress, clientPort)
+            received_message, (clientAddress, clientPort) = self.socket.receive()
+            opcode, checksum, nseq, filename, filesize, md5 = Packet.unpack_upload_request(received_message)
+            match opcode: 
+                case 0: # Upload
+                    StopAndWait.upload()
+                    break
+                case 2: # Download
+                    StopAndWait.download()
+                    break
+                case 7: # List
+                    #StopAndWait.list(message)
+                    break
+                case default:
+                    # print("message not understood")
+                    # close connection
+                    break
+            #modifiedMessage = message.decode().upper()
 
     def close(self):
         self.socket.close()

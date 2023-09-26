@@ -9,8 +9,7 @@ class Client:
         self.serverAddress = 'localhost'
         self.socket = Socket(self.port, self.address)
 
-    def send(self):
-        message = input('Input lowercase sentence:')
+    def send(self, message):
         self.socket.send(message.encode(), self.serverAddress, self.serverPort)
         modifiedMessage, serverAddress = self.socket.receive()
         print(modifiedMessage.decode())
