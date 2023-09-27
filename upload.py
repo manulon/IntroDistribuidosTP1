@@ -4,7 +4,7 @@ import getopt
 import os
 from client.Client import Client
 from common.constants import *
-from client.StopAndWait import *
+from client.ClientStopAndWait import *
 
 def main(argv):    
     verbosity = 0  # por defecto verbose 0

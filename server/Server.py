@@ -1,7 +1,7 @@
 from socket import *
 from common.Socket import Socket
 from common.Packet import Packet
-from server.StopAndWait import StopAndWait
+from server.ServerStopAndWait import StopAndWait
        
 class Server():
     def __init__(self, address, port):
