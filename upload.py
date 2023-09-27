@@ -83,10 +83,25 @@ def main(argv):
         binary_data = file.read()
 
     file_md5 = hashlib.md5(binary_data)
-    opcode_stop_and_wait = bytes([0x2])
+
+    has_protocol = False
+    protocol = 0
     
-    message = opcode_stop_and_wait + binary_data
+    while (has_protocol == False):
+        protocol = input('Ingrese el protocolo que queres utilizar: \n 1) Selective Repeat \n 2) Stop and Wait \n')
+        if (protocol == '1'):
+            protocol = bytes([0x1])
+            has_protocol = True
+        elif (protocol == '2'):
+            protocol = bytes([0x2])
+            has_protocol = True
+        else:
+            print('La opcion seleccionada no es valida. \n')
+
+    #message = bytes([0x0]) + protocol + binary_data 
     
+    message = bytes([0x0]) + protocol
+
     client.send(message)
     
     #protocol = StopAndWait(client)
