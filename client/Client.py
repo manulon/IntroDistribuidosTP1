@@ -10,7 +10,7 @@ class Client:
         self.socket = Socket(self.port, self.address)
 
     def send(self, message):
-        self.socket.send(message.encode(), self.serverAddress, self.serverPort)
+        self.socket.send(message, self.serverAddress, self.serverPort)
         modifiedMessage, serverAddress = self.socket.receive()
         print(modifiedMessage.decode())
 

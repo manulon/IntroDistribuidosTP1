@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import getopt
 import os
@@ -5,7 +6,7 @@ from client.Client import Client
 from common.constants import *
 from client.StopAndWait import *
 
-def main(argv):
+def main(argv):    
     verbosity = 0  # por defecto verbose 0
     host_service_ip_address = "localhost"  # por defecto localhost
     port_service_port = 16001  # por defecto 16001
@@ -75,12 +76,24 @@ def main(argv):
         return
 
     client = Client(host_service_ip_address, port_service_port)
-    message = input('Input lowercase sentence:')
+    
+    binary_data:bytes
+    print(file_name)
+    with open(file_name, 'rb') as file:
+        binary_data = file.read()
+
+    file_md5 = hashlib.md5(binary_data)
+    opcode_stop_and_wait = bytes([0x2])
+    
+    message = opcode_stop_and_wait + binary_data
+    
     client.send(message)
+    
     #protocol = StopAndWait(client)
     #protocol.upload(000000000)
     #client.send()
     client.close()
+    print("sent")
 
 if __name__ == '__main__':
     main(sys.argv[1:])
