@@ -13,17 +13,15 @@ class Server():
         print('The server is ready to receive')
         while True:
             received_message, (clientAddress, clientPort) = self.socket.receive()
-            _opcode = Packet.unpack_opcode(received_message[:1],received_message[:1])
-            opcode = int.from_bytes(_opcode, byteorder='little') 
-            #opcode, checksum, nseq, filename, filesize, md5 = Packet.unpack_upload_request(received_message)
-            match opcode: 
+            opcode = int.from_bytes(received_message[:1])
+            match opcode:
                 case 0: # Upload
-                    _protocol = Packet.unpack_protocol(received_message[1:2],received_message[1:2])
-                    protocol = int.from_bytes(_protocol, byteorder='little')
-                    if protocol == 1:
-                       print('Seleccionaste Selective Repeat')
+                    header, payload = Packet.unpack_upload_request(received_message, received_message)
+                    print(header, payload)
+                    if payload['protocol'] == 1:
+                        print('Seleccionaste Selective Repeat')
                     else:
-                       print('Seleccionaste Stop and Wait')
+                        print('Seleccionaste Stop and Wait')
                     break
                 case 2: # Download
                     #print('downloading (stop and wait): '+ str(message))

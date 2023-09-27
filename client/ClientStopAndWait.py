@@ -1,6 +1,8 @@
 from common.Packet import Packet
 import os
 from common.Hasher import Hasher
+from common.Utils import Utils
+
 
 class ClientStopAndWait:
     def __init__(self):
@@ -8,20 +10,12 @@ class ClientStopAndWait:
         self.serverPort = None
         self.socket = None
         self.protocolID = bytes([0x2])
+
     def upload(self, filename):
         """
             Mandar mensaje inicial
         """
-        # checksum = Hasher.checksum(package)
-        # opcode = 0
-        # checksum = 0 # 4 bytes
-        # file_size = os.stat(filename).st_size
-        # with open(filename, 'rb') as f:
-        # read_bytes = f.read()
-        # md5_encoding = Hasher.md5(read_bytes)
-        # message = Packet.pack_upload_request(checksum, 0, filename, file_size, md5_encoding)
-        message = bytes([0x0]) + self.protocolID
-        self.send(message)
+        self.uploadRequest(filename)
 
         # TODO: Esto es lo que tenian antes usted:
         """ 
@@ -44,6 +38,23 @@ class ClientStopAndWait:
             message = Packet.pack_upload_request(checksum, 0, filename, file_size, md5_encoding)
             self.client.send(message)
         """
+
+    def uploadRequest(self, fileName):
+        utils = Utils()
+        packet = Packet()
+        opcode = bytes([0x0])
+        checksum = (2).to_bytes()
+        nseq = (3).to_bytes()
+        header = (opcode, checksum, nseq)
+
+        protocol = self.protocolID
+        fileName = fileName.encode()
+        fileSize = utils.bytes(16)  # 16 bytes vacíos
+        md5 = utils.bytes(16)  # 16 bytes vacíos
+        payload = (protocol, fileName, fileSize, md5)
+
+        message = packet.pack_upload_request(header, payload)
+        self.send(message)
     def setServerInfo(self, serverAddress, serverPort, socket):
         self.serverAddress = serverAddress
         self.serverPort = serverPort
