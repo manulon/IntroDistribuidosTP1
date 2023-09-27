@@ -3,10 +3,11 @@ import sys
 import getopt
 import os
 from client.Client import Client
+from client.ClientSelectiveRepeat import ClientSelectiveRepeat
 from common.constants import *
 from client.ClientStopAndWait import *
 
-def main(argv):    
+def main(argv):
     verbosity = 0  # por defecto verbose 0
     host_service_ip_address = "localhost"  # por defecto localhost
     port_service_port = 16001  # por defecto 16001
@@ -76,37 +77,21 @@ def main(argv):
         return
 
     client = Client(host_service_ip_address, port_service_port)
-    
-    binary_data:bytes
-    print(file_name)
-    with open(file_name, 'rb') as file:
-        binary_data = file.read()
-
-    file_md5 = hashlib.md5(binary_data)
 
     has_protocol = False
-    protocol = 0
-    
     while (has_protocol == False):
         protocol = input('Ingrese el protocolo que queres utilizar: \n 1) Selective Repeat \n 2) Stop and Wait \n')
         if (protocol == '1'):
-            protocol = bytes([0x1])
+            client.setProtocol(ClientSelectiveRepeat())
             has_protocol = True
         elif (protocol == '2'):
-            protocol = bytes([0x2])
+            client.setProtocol(ClientStopAndWait())
             has_protocol = True
         else:
             print('La opcion seleccionada no es valida. \n')
 
-    #message = bytes([0x0]) + protocol + binary_data 
-    
-    message = bytes([0x0]) + protocol
+    client.upload(file_name)
 
-    client.send(message)
-    
-    #protocol = StopAndWait(client)
-    #protocol.upload(000000000)
-    #client.send()
     client.close()
     print("sent")
 
