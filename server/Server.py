@@ -12,14 +12,16 @@ class Server():
     def receive(self):
         print('The server is ready to receive')
         while True:
-            received_message, (clientAddress, clientPort) = self.socket.receive()
-            opcode, checksum, nseq, filename, filesize, md5 = Packet.unpack_upload_request(received_message)
+            received_message, (clientAddress, clientPort) = self.socket.receive()            
+            opcode, message =Packet.unpack_upload_request(received_message,received_message)            
+            #opcode, checksum, nseq, filename, filesize, md5 = Packet.unpack_upload_request(received_message)
             match opcode: 
                 case 0: # Upload
                     StopAndWait.upload()
                     break
                 case 2: # Download
-                    StopAndWait.download()
+                    print('downloading (stop and wait): '+ str(message))
+                    #StopAndWait.download()
                     break
                 case 7: # List
                     #StopAndWait.list(message)
