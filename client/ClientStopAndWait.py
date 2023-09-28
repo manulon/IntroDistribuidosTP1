@@ -59,8 +59,6 @@ class ClientStopAndWait:
         
     def send(self, message):
         self.socket.send(message, self.serverAddress, self.serverPort)
-        modifiedMessage, serverAddress = self.socket.receive()
-        print(modifiedMessage.decode())
 
     def download(self, filename):
         pass

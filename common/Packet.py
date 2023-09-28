@@ -1,19 +1,6 @@
 import struct
 from common.Utils import Utils
-
-REQUEST_CONTENT = "20s"
-OPCODE_MASK = 0xF
-
-OPCODE_FORMAT = 'c'
-CHECKSUM_FORMAT = '4s'
-NSEQ_FORMAT = '4s'
-HEADER_FORMAT = OPCODE_FORMAT + CHECKSUM_FORMAT + NSEQ_FORMAT
-
-PROTOCOL_FORMAT = 'c'
-FILE_NAME_FORMAT = '20s'
-FILE_SIZE_FORMAT = '16s'
-MD5 = '16s'
-UPLOAD_REQUEST_FORMAT = PROTOCOL_FORMAT + FILE_NAME_FORMAT + FILE_SIZE_FORMAT + MD5
+from common.constants import *
 
 class Packet:
     
@@ -44,6 +31,29 @@ class Packet:
             'fileName': fileName.decode(),
             'fileSize': Utils.bytesToInt(fileSize),
             'md5': md5.decode()
+        }
+
+        return header, payload
+    
+    @staticmethod
+    def pack_file_transfer_type_response(header, chunksize):
+        opcode = header[0]
+        checksum = header[1]
+        nseq = header[2]
+        
+        return struct.pack(HEADER_FORMAT + FILE_TRANSFER_TYPE_FORMAT, opcode, checksum, nseq, chunksize)
+
+    @staticmethod
+    def unpack_file_transfer_type_response(bytes):
+        opcode, checksum, nseq, chunksize = struct.unpack(HEADER_FORMAT + FILE_TRANSFER_TYPE_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+        payload = {
+            'chunksize': Utils.bytesToInt(chunksize),
         }
 
         return header, payload

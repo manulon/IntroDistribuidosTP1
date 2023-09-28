@@ -93,7 +93,6 @@ def main(argv):
     client.upload(file_name)
 
     client.close()
-    print("sent")
 
 if __name__ == '__main__':
     main(sys.argv[1:])

@@ -17,29 +17,38 @@ class ClientSelectiveRepeat:
 
     def send(self, message):
         self.socket.send(message, self.serverAddress, self.serverPort)
-        modifiedMessage, serverAddress = self.socket.receive()
-        print(modifiedMessage.decode())
         
     def upload(self, filename):
         """
             Mandar mensaje inicial
         """
-        self.uploadRequest(filename)
+        self.sendUploadRequest(filename)
+        self.receiveFileTransferTypeResponse()
 
-    def uploadRequest(self, fileName):
+    def sendUploadRequest(self, fileName):
         opcode = bytes([0x0])
         checksum = (2).to_bytes(1, BYTEORDER)
-        nseq = (3).to_bytes(1, BYTEORDER)
+        nseq = (0).to_bytes(1, BYTEORDER)
         header = (opcode, checksum, nseq)
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        fileSize = Utils.bytes(16) # 16 bytes vacíos
-        md5 = Utils.bytes(16) # 16 bytes vacíos
-        payload = (protocol, fileName, fileSize, md5)
+        fileSize = Utils.bytes(16)      # 16 bytes vacíos
+        md5      = Utils.bytes(16)      # 16 bytes vacíos
+        payload  = (protocol, fileName, fileSize, md5)
 
         message = Packet.pack_upload_request(header, payload)
         self.send(message)
+
+    def receiveFileTransferTypeResponse(self):
+        received_message, (serverAddres, serverPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+        
+        header, payload = Packet.unpack_file_transfer_type_response(received_message)
+        print('----------')
+        print('Recibi este header:', header)
+        print('El tamaño del chunk es:', payload)
+        print('¡Adios!')
+        
 
     def download(self, filename):
         pass

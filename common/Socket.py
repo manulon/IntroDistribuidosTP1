@@ -10,8 +10,9 @@ class Socket:
     def send(self, msg, address, port):
         self.socket.sendto(msg, (address, port))
 
-    def receive(self):
-        return self.socket.recvfrom(2048)      
+    # bufsize: bytes que debo recibir
+    def receive(self, bufsize):
+        return self.socket.recvfrom(bufsize)      
 
     def close(self):
         self.socket.close()
