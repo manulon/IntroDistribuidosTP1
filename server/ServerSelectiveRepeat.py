@@ -35,7 +35,10 @@ class ServerSelectiveRepeat:
 
         while acksSent != totalPackets:
             header, payload = self.receivePackage()
-            self.sendACK(header['nseq'])
+
+            if self.isChecksumOK(header, payload):
+                self.sendACK(header['nseq'])
+            
             for e in self.window:
                 if header['nseq'] == e['nseq']:
                     e['isACKSent'] == True
@@ -84,3 +87,8 @@ class ServerSelectiveRepeat:
         print('######################')
         print('El archivo se ha descargado! Su contenido es el siguiente:')
         print(content)
+
+    def isChecksumOK(self, header, payload):
+        # AGREGAR LÓGICA PARA RE-CALCULAR EL CHECKSUM
+        checksumCalculado = 2
+        return header['checksum'] == checksumCalculado
