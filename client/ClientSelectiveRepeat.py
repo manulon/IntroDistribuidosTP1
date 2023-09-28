@@ -17,10 +17,12 @@ class ClientSelectiveRepeat:
         self.serverAddress = serverAddress
         self.serverPort = serverPort
         self.socket = socket
+
     def send(self, message):
         self.socket.send(message, self.serverAddress, self.serverPort)
         modifiedMessage, serverAddress = self.socket.receive()
         print(modifiedMessage.decode())
+        
     def upload(self, filename):
         """
             Mandar mensaje inicial

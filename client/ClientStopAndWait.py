@@ -55,10 +55,12 @@ class ClientStopAndWait:
 
         message = packet.pack_upload_request(header, payload)
         self.send(message)
+
     def setServerInfo(self, serverAddress, serverPort, socket):
         self.serverAddress = serverAddress
         self.serverPort = serverPort
         self.socket = socket
+        
     def send(self, message):
         self.socket.send(message, self.serverAddress, self.serverPort)
         modifiedMessage, serverAddress = self.socket.receive()
