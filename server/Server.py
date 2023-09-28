@@ -1,8 +1,8 @@
 from socket import *
 from common.Socket import Socket
 from common.Packet import Packet
-from server.ServerStopAndWait import StopAndWait
-       
+from common.constants import *
+
 class Server():
     def __init__(self, address, port):
         self.port = port
@@ -13,10 +13,10 @@ class Server():
         print('The server is ready to receive')
         while True:
             received_message, (clientAddress, clientPort) = self.socket.receive()
-            opcode = int.from_bytes(received_message[:1])
+            opcode = int.from_bytes(received_message[:1], BYTEORDER)
             match opcode:
                 case 0: # Upload
-                    header, payload = Packet.unpack_upload_request(received_message, received_message)
+                    header, payload = Packet.unpack_upload_request(received_message)
                     print(header, payload)
                     if payload['protocol'] == 1:
                         print('Seleccionaste Selective Repeat')

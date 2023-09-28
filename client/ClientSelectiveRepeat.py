@@ -1,9 +1,6 @@
-import os
-
-from common.Hasher import Hasher
 from common.Packet import Packet
 from common.Utils import Utils
-
+from common.constants import *
 
 class ClientSelectiveRepeat:
 
@@ -30,20 +27,18 @@ class ClientSelectiveRepeat:
         self.uploadRequest(filename)
 
     def uploadRequest(self, fileName):
-        utils = Utils()
-        packet = Packet()
         opcode = bytes([0x0])
-        checksum = (2).to_bytes()
-        nseq = (3).to_bytes()
+        checksum = (2).to_bytes(1, BYTEORDER)
+        nseq = (3).to_bytes(1, BYTEORDER)
         header = (opcode, checksum, nseq)
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        fileSize = utils.bytes(16) # 16 bytes vacíos
-        md5 = utils.bytes(16) # 16 bytes vacíos
+        fileSize = Utils.bytes(16) # 16 bytes vacíos
+        md5 = Utils.bytes(16) # 16 bytes vacíos
         payload = (protocol, fileName, fileSize, md5)
 
-        message = packet.pack_upload_request(header, payload)
+        message = Packet.pack_upload_request(header, payload)
         self.send(message)
 
     def download(self, filename):

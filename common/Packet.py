@@ -16,7 +16,9 @@ MD5 = '16s'
 UPLOAD_REQUEST_FORMAT = PROTOCOL_FORMAT + FILE_NAME_FORMAT + FILE_SIZE_FORMAT + MD5
 
 class Packet:
-    def pack_upload_request(self, header, payload):
+    
+    @staticmethod
+    def pack_upload_request(header, payload):
         opcode = header[0]
         checksum = header[1]
         nseq = header[2]
@@ -28,19 +30,19 @@ class Packet:
         return struct.pack(HEADER_FORMAT + UPLOAD_REQUEST_FORMAT, opcode, checksum, nseq, 
                            protocol, fileName, fileSize, md5)
 
-    def unpack_upload_request(self, bytes):
-        utils = Utils()
+    @staticmethod
+    def unpack_upload_request(bytes):
         opcode, checksum, nseq, protocol, fileName, fileSize, md5 = struct.unpack(HEADER_FORMAT + UPLOAD_REQUEST_FORMAT,bytes)
         
         header = {
-            'opcode': utils.bytesToInt(opcode),
-            'checksum': utils.bytesToInt(checksum),
-            'nseq': utils.bytesToInt(nseq)
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
         }
         payload = {
-            'protocol': utils.bytesToInt(protocol),
+            'protocol': Utils.bytesToInt(protocol),
             'fileName': fileName.decode(),
-            'fileSize': utils.bytesToInt(fileSize),
+            'fileSize': Utils.bytesToInt(fileSize),
             'md5': md5.decode()
         }
 
