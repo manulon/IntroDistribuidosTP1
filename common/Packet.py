@@ -57,3 +57,44 @@ class Packet:
         }
 
         return header, payload
+        
+    @staticmethod
+    def pack_package(header, payload):
+        opcode = header[0]
+        checksum = header[1]
+        nseq = header[2]
+        
+        return struct.pack(HEADER_FORMAT + PACKAGE_FORMAT, opcode, checksum, nseq, payload)
+
+    @staticmethod
+    def unpack_ack(bytes):
+        opcode, checksum, nseq = struct.unpack(HEADER_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+
+        return header
+
+        
+    @staticmethod
+    def unpack_package(bytes):
+        opcode, checksum, nseq, payload = struct.unpack(HEADER_FORMAT + PACKAGE_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+
+        return header, payload
+    
+    @staticmethod
+    def pack_ack(header):
+        opcode = header[0]
+        checksum = header[1]
+        nseq = header[2]
+        
+        return struct.pack(HEADER_FORMAT, opcode, checksum, nseq)

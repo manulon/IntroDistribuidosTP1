@@ -39,7 +39,7 @@ class ClientStopAndWait:
 
     def uploadRequest(self, fileName):
         opcode = bytes([0x0])
-        checksum = (2).to_bytes(1, BYTEORDER)
+        checksum = (2).to_bytes(4, BYTEORDER)
         nseq = (3).to_bytes(1, BYTEORDER)
         header = (opcode, checksum, nseq)
 

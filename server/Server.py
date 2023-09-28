@@ -24,6 +24,7 @@ class Server():
                         protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort)
                         self.protocol = protocol
                         self.protocol.sendFileTransferTypeResponse()
+                        self.protocol.upload(payload['fileSize'])
                     else:
                         print('Seleccionaste Stop and Wait')
                     break
