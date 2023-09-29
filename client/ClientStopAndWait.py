@@ -9,6 +9,11 @@ class ClientStopAndWait:
         self.socket = None
         self.protocolID = bytes([0x2])
 
+    def setServerInfo(self, serverAddress, serverPort, socket):
+        self.serverAddress = serverAddress
+        self.serverPort = serverPort
+        self.socket = socket
+
     def upload(self, filename):
         self.uploadRequest(filename)
         chunksize = self.receiveFileTransferTypeResponse()
@@ -45,8 +50,8 @@ class ClientStopAndWait:
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        fileSize = Utils.bytes(16)  # 16 bytes vacíos
-        md5 = Utils.bytes(16)  # 16 bytes vacíos
+        fileSize = (4096*31).to_bytes(16, BYTEORDER)       # 16 bytes 
+        md5 = Utils.bytes(16)                              # 16 bytes vacíos
         payload = (protocol, fileName, fileSize, md5)
 
         message = Packet.pack_upload_request(header, payload)
@@ -78,7 +83,7 @@ class ClientStopAndWait:
         print('¡Adios!')
         '''
 
-    def send_file(self, filename, chunksize):
+    def sendFile(self, filename, chunksize):
         mockFile = b''
         numberOfPackets = 31
         for i in range(numberOfPackets):
@@ -90,7 +95,7 @@ class ClientStopAndWait:
 
         while (packetsPushed < totalPackets):
             sequenceNumber = (packetsPushed + 1) % 2 # starts in 1
-            payload = mockFile[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
+            payload = mockFile[packetsPushed * chunksize : (packetsPushed + 1) * chunksize]
             self.sendPacket(sequenceNumber, payload)
             ackNseq = self.receiveACK()
             if (ackNseq == sequenceNumber):
@@ -110,10 +115,6 @@ class ClientStopAndWait:
         message = Packet.pack_package(header, payload)
         self.send(message)
 
-    def setServerInfo(self, serverAddress, serverPort, socket):
-        self.serverAddress = serverAddress
-        self.serverPort = serverPort
-        self.socket = socket
         
     def send(self, message):
         self.socket.send(message, self.serverAddress, self.serverPort)

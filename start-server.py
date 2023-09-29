@@ -2,6 +2,7 @@ import getopt
 import sys
 from server.Server import Server
 
+
 def main(argv):
     verbosity = 0
     host_service_ip_address = 'localhost'

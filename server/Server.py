@@ -2,8 +2,9 @@ from socket import *
 from common.Socket import Socket
 from common.Packet import Packet
 from common.constants import *
-from server.ServerSelectiveRepeat import *
-from server.ServerStopAndWait import *
+from common.Utils import *
+from server.ServerSelectiveRepeat import ServerSelectiveRepeat
+from server.ServerStopAndWait import ServerStopAndWait
 
 class Server():
     MAX_FILE_SIZE = 4000000000 # 4GB
