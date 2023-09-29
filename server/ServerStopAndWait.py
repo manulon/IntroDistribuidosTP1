@@ -31,7 +31,7 @@ class ServerStopAndWait:
         file = {}
         totalPackets = filesize / CHUNKSIZE
         acksSent = 0
-        nextNseq = 0
+        nextNseq = 1
         file = b''
 
         while acksSent < totalPackets:
@@ -40,13 +40,13 @@ class ServerStopAndWait:
                 package = Packet.pack_package(header, payload)
                 if header['checksum'] == Hasher.checksum(package):
                     self.sendACK(header['nseq'])
-                    acksSent += 1
                     file += payload
                     nextNseq = acksSent % 2
+                    acksSent += 1
                 else:
                     print('Error de checksum')
                     #self.sendInvalidChecksum()
-            else: # client resends package (lost ACK) - cases 3 and 4
+            else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
                 self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
 
         self.showFileAsBytes(file)

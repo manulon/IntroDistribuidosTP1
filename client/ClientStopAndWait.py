@@ -92,7 +92,7 @@ class ClientStopAndWait:
         packetsPushed = 0
 
         while (packetsPushed < totalPackets):
-            sequenceNumber = packetsPushed % 2
+            sequenceNumber = (packetsPushed + 1) % 2 # starts in 1
             payload = mockFile[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
             self.sendPacket(sequenceNumber, payload)
             ackNseq = self.receiveACK()
