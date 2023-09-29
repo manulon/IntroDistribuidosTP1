@@ -78,7 +78,6 @@ class Packet:
 
         return header
 
-        
     @staticmethod
     def unpack_package(bytes):
         opcode, checksum, nseq, payload = struct.unpack(HEADER_FORMAT + PACKAGE_FORMAT, bytes)
@@ -98,3 +97,30 @@ class Packet:
         nseq = header[2]
         
         return struct.pack(HEADER_FORMAT, opcode, checksum, nseq)
+    
+    @staticmethod
+    def pack_stop_file_transfer(header, payload):
+        opcode = header[0]
+        checksum = header[1]
+        nseq = header[2]
+        md5 = payload[0]
+        state = payload[1]
+
+        return struct.pack(HEADER_FORMAT + STOP_FILE_TRANSFER_FORMAT, opcode, checksum, nseq, md5, state)
+    
+    @staticmethod
+    def unpack_stop_file_transfer(bytes):
+        opcode, checksum, nseq, md5, state = struct.unpack(HEADER_FORMAT + STOP_FILE_TRANSFER_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+        payload = {
+            'md5': md5.decode(),
+            'state': Utils.bytesToInt(state)
+        }
+
+        return header, payload
+    

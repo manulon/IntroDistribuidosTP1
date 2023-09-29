@@ -1,3 +1,4 @@
+import math
 import time
 from common.Packet import Packet
 from common.Utils import Utils
@@ -14,7 +15,6 @@ class ClientSelectiveRepeat:
         self.protocolID = bytes([0x1])
         self.window = []
         self.chunksize = None
-        self.retries = False
   
     def setServerInfo(self, serverAddress, serverPort, socket):
         self.serverAddress = serverAddress
@@ -28,27 +28,20 @@ class ClientSelectiveRepeat:
         initCommunicationSocketTimeout = 0
         communicationStarted = False
 
-        # ONLY FOR TESTING #
-        enviarElPrimerPaquete = False
-        # ONLY FOR TESTING #
-
-        self.sendUploadRequest(filename, enviarElPrimerPaquete)
-        enviarElPrimerPaquete = True
+        self.sendUploadRequest(filename)
         firstPacketSentTime = time.time()
 
         while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
             try:
                 self.socket.settimeout(0.2)
                 self.receiveFileTransferTypeResponse()
-                print('¡El paquete fue recibido! La comunicacion puede empezar :)')
                 initCommunicationSocketTimeout = 0
                 communicationStarted = True
             except TimeoutError:
                 initCommunicationSocketTimeout += 1
 
             if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                print('--- TIMEOUT Y RETRANSMISION DEL PACKET:', 0, '---')
-                self.sendUploadRequest(filename, enviarElPrimerPaquete)
+                self.sendUploadRequest(filename)
                 firstPacketSentTime = time.time()
 
 
@@ -63,17 +56,9 @@ class ClientSelectiveRepeat:
         #        FAKE STRING BYTES            #
         #######################################
 
-        # while no termine de enviar paquetes 
-        #     lleno la window
-        #     envio todo
-        #     espero acks
-        #     marco en la cola que me llego 
-        #     if es el primero en la cola
-        #        dropeo n paquetes
-
         # VER COMO LO CONSEGUIMOS XD
         filesize = 4096*31
-        totalPackets = filesize / CHUNKSIZE
+        totalPackets = math.ceil(filesize / CHUNKSIZE)
         packetsACKed = 0
         packetsPushed = 0
         nseq = 1
@@ -106,21 +91,20 @@ class ClientSelectiveRepeat:
                     e['isACKed'] = True
                     packetsACKed += 1  
                 if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                    print('--- TIMEOUT Y RETRANSMISION DEL PACKET:', e['nseq'], '---')
                     self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
             
             if self.window[0]['isACKed']:
                 self.moveWindow()
 
-        print('packetsACKed: ', packetsACKed, 'socketTimeouts: ', socketTimeouts)
 
-    def sendUploadRequest(self, fileName, enviarElPrimerPaquete):
+        self.stopUploading(int(totalPackets + 1))
+
+        print('La transferencia ha finalizado')
+
+    def sendUploadRequest(self, fileName):
         opcode = bytes([0x0])
-        if enviarElPrimerPaquete == False:
-            checksum = (2333).to_bytes(4, BYTEORDER)
-        else: 
-            checksum = (2).to_bytes(4, BYTEORDER)
+        checksum = (2).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
         header = (opcode, checksum, nseq)
 
@@ -144,9 +128,6 @@ class ClientSelectiveRepeat:
         opcode = bytes([0x4])
 
         checksum = (2).to_bytes(4, BYTEORDER)
-        if nseq == 10 and not self.retries:
-            checksum = (0).to_bytes(4, BYTEORDER)
-            self.retries = True
            
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         header = (opcode, checksum, nseqToBytes)
@@ -165,6 +146,26 @@ class ClientSelectiveRepeat:
     def moveWindow(self):
         while len(self.window) != 0 and self.window[0]['isACKed']:
             self.window.pop(0)
+
+    def stopUploading(self, nseq):
+        self.socket.settimeout(None)
+        received_message, (serverAddres, serverPort) = self.socket.receive(STOP_FILE_TRANSFER_SIZE)
+
+        header, payload = Packet.unpack_stop_file_transfer(received_message)
+        print('Recibi el ACK: ', header['nseq'])
+
+        # Aca va la verificacion del md5 del archivo y el state
+
+        opcode = bytes([0x7])
+        checksum = (2).to_bytes(4, BYTEORDER)
+        nseqToBytes = (header['nseq']).to_bytes(4, BYTEORDER)
+        header = (opcode, checksum, nseqToBytes)
+
+        message = Packet.pack_ack(header)
+        
+        self.send(message)
+
+        print('La carga del archivo ha finalizado, yo ya me cierro. ¡Adios!')
 
     def download(self, filename):
         pass

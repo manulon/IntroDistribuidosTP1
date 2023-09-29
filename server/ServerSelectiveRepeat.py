@@ -1,3 +1,5 @@
+import math
+import time
 from common.Packet import Packet
 from common.Utils import Utils
 from common.constants import *
@@ -23,20 +25,9 @@ class ServerSelectiveRepeat:
         # chunksize fijo (4096 bytes)
         chunksize = CHUNKSIZE.to_bytes(4, BYTEORDER)
 
-        # VARIABLE PARA TESTEAR #
-        esLaPrimeraVezQueMandoEstePaquete = True
-        # VARIABLE PARA TESTEAR #
-
         message = Packet.pack_file_transfer_type_response(header, chunksize)
-        if esLaPrimeraVezQueMandoEstePaquete:
-            esLaPrimeraVezQueMandoEstePaquete = False
-            print('No estoy enviando el paquete 0001')
-        else:
-            # A ESTE ELSE NUNCA VA A ENTRAR, POR LO QUE
-            # TENDRA QUE EJECUTARSE EL SEND DE LA LINEA 43
-            # ESTE IF DEBE BORRARSE CUANDO SE ELIMINE LA 
-            # VARIABLE Y DEJAR SOLAMENTE EL self.send(message)
-            self.send(message)
+
+        self.send(message)
 
         nextPacketIsADataPacket = False
 
@@ -44,7 +35,6 @@ class ServerSelectiveRepeat:
 
         while not nextPacketIsADataPacket:
             if receivedPacketHeader['opcode'] == 0:
-                print('Ahora si, envio el paquete 0001')
                 self.send(message)
                 receivedPacketHeader, receivedPacketPayload = self.receivePackage()
             else:
@@ -53,28 +43,15 @@ class ServerSelectiveRepeat:
         return receivedPacketHeader, receivedPacketPayload
             
     def upload(self, filesize):
-        # La funcion sendFileTransferTypeResponse() al asegurarse
-        # de que llegó correctamente el paquete a destino, va a 
-        # leer el primer paquete de la comunciacion y se lo va a 
-        # pasar al protocolo para que siga haciendo las cosas.
-        # Esto es debido a que es posible que esa respuesta se 
-        # pierda, y en ese caso debe corroborarse que el proximo
-        # paquete que llegue sea uno de los datos del archivo y 
-        # no un retry del paquete que llego con anterioridad 
-        # porque se perdio ese 'ACK' (el paquete 0001)
         header, payload = self.sendFileTransferTypeResponse()
 
         file = {}
-        totalPackets = filesize / CHUNKSIZE
+        totalPackets = math.ceil(filesize / CHUNKSIZE)
         distinctAcksSent = 0
         firstIteration = True
 
         for i in range(1,10):
             self.window.append({'nseq': i, 'isACKSent': False})
-
-        # VARIABLE PARA TESTEAR #
-        enviarElACK6 = False
-        # VARIABLE PARA TESTEAR #
 
         while distinctAcksSent != totalPackets:
             if not firstIteration:
@@ -83,14 +60,7 @@ class ServerSelectiveRepeat:
                 firstIteration = False
 
             if self.isChecksumOK(header, payload):
-                # ESTO ESTA PARA TESTEAR, SI HAY QUE SACAR EL 
-                # IF Y LUEGO DEJAR SOLO LA LINEA 
-                # 'self.sendACK(header['nseq'])'
-                if header['nseq'] == 6 and (not enviarElACK6):
-                    print('### NO VOY A ENVIAR EL ACK 6 ###')
-                    enviarElACK6 = True
-                else:
-                    self.sendACK(header['nseq'])
+                self.sendACK(header['nseq'])
             
             for e in self.window:
                 if (not e['isACKSent']) and header['nseq'] == e['nseq']:
@@ -100,6 +70,8 @@ class ServerSelectiveRepeat:
                   
             if header['nseq'] == self.window[0]['nseq']:
                 self.moveWindow()
+
+        self.stopFileTransfer(totalPackets+1)
 
         self.showFile(file)
 
@@ -142,9 +114,43 @@ class ServerSelectiveRepeat:
 
         print('######################')
         print('El archivo se ha descargado! Su contenido es el siguiente:')
+        print('######################')
+        print('######################')
         print(content)
 
     def isChecksumOK(self, header, payload):
         # AGREGAR LÓGICA PARA RE-CALCULAR EL CHECKSUM
         checksumCalculado = 2
         return header['checksum'] == checksumCalculado
+    
+    def stopFileTransfer(self, nseq):
+        opcode = bytes([0x6])
+        checksum = (2).to_bytes(4, BYTEORDER)
+        nseqToBytes = nseq.to_bytes(4, BYTEORDER)
+        header = (opcode, checksum, nseqToBytes)
+
+        md5 = (2).to_bytes(4, BYTEORDER)    # 16 bytes, deben calcularse
+        state = bytes([0x1])                # harcodeado (1 ok, 0 no ok)
+        payload = (md5, state)
+
+        message = Packet.pack_stop_file_transfer(header, payload)
+    
+        self.send(message)
+        stopFileTransferMsgSentAt = time.time()
+
+        communicationFinished = False
+        stopCommunicationSocketTimeout = 0
+
+        while (not communicationFinished) and (stopCommunicationSocketTimeout < LAST_ACK_PACKET_TIMEOUT):
+           try:
+               self.socket.settimeout(0.2)
+               received_message, (serverAddres, serverPort) = self.socket.receive(ACK_SIZE)
+               stopCommunicationSocketTimeout = 0
+               communicationFinished = True
+           except TimeoutError:
+               # Acá se da por sentado que el cliente se cerró
+               stopCommunicationSocketTimeout += 1
+
+           if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                self.send(message)
+                stopFileTransferMsgSentAt = time.time()            
