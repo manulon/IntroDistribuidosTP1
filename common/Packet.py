@@ -98,3 +98,10 @@ class Packet:
         nseq = header[2]
         
         return struct.pack(HEADER_FORMAT, opcode, checksum, nseq)
+    
+    @staticmethod
+    def pack_file_too_big_error():
+        opcode = (FILE_TOO_BIG_OPCODE).to_bytes(1, BYTEORDER)
+        checksum = (0).to_bytes(1, BYTEORDER)
+        nseq = (0).to_bytes(1, BYTEORDER)
+        return struct.pack(HEADER_FORMAT, opcode, checksum, nseq)

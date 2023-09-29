@@ -5,6 +5,8 @@ from common.constants import *
 from server.ServerSelectiveRepeat import *
 
 class Server():
+    MAX_FILE_SIZE = 4000000000 # 4GB
+
     def __init__(self, address, port):
         self.port = port
         self.address = address
@@ -27,6 +29,7 @@ class Server():
                         self.protocol.upload(payload['fileSize'])
                     else:
                         print('Seleccionaste Stop and Wait')
+                    #StopAndWait.upload(payload['fileName'], payload['fileSize'], payload['md5'])
                     break
                 case 2: # Download
                     #print('downloading (stop and wait): '+ str(message))

@@ -95,7 +95,6 @@ class ClientSelectiveRepeat:
 
     def receiveFileTransferTypeResponse(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
-        
         header, payload = Packet.unpack_file_transfer_type_response(received_message)
 
         self.chunksize = payload['chunksize']
