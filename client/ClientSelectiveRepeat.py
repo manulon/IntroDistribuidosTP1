@@ -25,11 +25,32 @@ class ClientSelectiveRepeat:
         self.socket.send(message, self.serverAddress, self.serverPort)
         
     def upload(self, filename):
-        """
-            Mandar mensaje inicial
-        """
-        self.sendUploadRequest(filename)
-        self.receiveFileTransferTypeResponse()
+        initCommunicationSocketTimeout = 0
+        communicationStarted = False
+
+        # ONLY FOR TESTING #
+        enviarElPrimerPaquete = False
+        # ONLY FOR TESTING #
+
+        self.sendUploadRequest(filename, enviarElPrimerPaquete)
+        enviarElPrimerPaquete = True
+        firstPacketSentTime = time.time()
+
+        while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
+            try:
+                self.socket.settimeout(0.2)
+                self.receiveFileTransferTypeResponse()
+                print('¡El paquete fue recibido! La comunicacion puede empezar :)')
+                initCommunicationSocketTimeout = 0
+                communicationStarted = True
+            except TimeoutError:
+                initCommunicationSocketTimeout += 1
+
+            if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                print('--- TIMEOUT Y RETRANSMISION DEL PACKET:', 0, '---')
+                self.sendUploadRequest(filename, enviarElPrimerPaquete)
+                firstPacketSentTime = time.time()
+
 
         #######################################
         #        FAKE STRING BYTES            #
@@ -94,9 +115,12 @@ class ClientSelectiveRepeat:
 
         print('packetsACKed: ', packetsACKed, 'socketTimeouts: ', socketTimeouts)
 
-    def sendUploadRequest(self, fileName):
+    def sendUploadRequest(self, fileName, enviarElPrimerPaquete):
         opcode = bytes([0x0])
-        checksum = (2).to_bytes(4, BYTEORDER)
+        if enviarElPrimerPaquete == False:
+            checksum = (2333).to_bytes(4, BYTEORDER)
+        else: 
+            checksum = (2).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
         header = (opcode, checksum, nseq)
 

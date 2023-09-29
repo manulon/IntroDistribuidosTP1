@@ -26,15 +26,44 @@ class ServerSelectiveRepeat:
         message = Packet.pack_file_transfer_type_response(header, chunksize)
         self.send(message)
 
+        nextPacketIsADataPacket = False
+        receivedPacketHeader, receivedPacketPayload = self.receivePackage()
+
+        while not nextPacketIsADataPacket:
+            if receivedPacketHeader['opcode'] == 1:
+                self.send(message)
+                receivedPacketHeader, receivedPacketPayload = self.receivePackage()
+            else:
+                nextPacketIsADataPacket = True
+
+        return receivedPacketHeader, receivedPacketPayload
+            
     def upload(self, filesize):
+        # La funcion sendFileTransferTypeResponse() al asegurarse
+        # de que llegó correctamente el paquete a destino, va a 
+        # leer el primer paquete de la comunciacion y se lo va a 
+        # pasar al protocolo para que siga haciendo las cosas.
+        # Esto es debido a que es posible que esa respuesta se 
+        # pierda, y en ese caso debe corroborarse que el proximo
+        # paquete que llegue sea uno de los datos del archivo y 
+        # no un retry del paquete que llego con anterioridad 
+        # porque se perdio ese 'ACK' (el paquete 0001)
+        header, payload = self.sendFileTransferTypeResponse()
+
         file = {}
         totalPackets = filesize / CHUNKSIZE
         distinctAcksSent = 0
+        # Perdon por esta variable, no se me ocurria otra manera
+        firstIteration = True
+
         for i in range(1,10):
             self.window.append({'nseq': i, 'isACKSent': False})
 
         while distinctAcksSent != totalPackets:
-            header, payload = self.receivePackage()
+            if not firstIteration:
+                header, payload = self.receivePackage()
+            else:
+                firstIteration = False
 
             if self.isChecksumOK(header, payload):
                 self.sendACK(header['nseq'])
