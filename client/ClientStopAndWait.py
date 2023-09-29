@@ -10,9 +10,6 @@ class ClientStopAndWait:
         self.protocolID = bytes([0x2])
 
     def upload(self, filename):
-        """
-            Mandar mensaje inicial
-        """
         self.uploadRequest(filename)
         chunksize = self.receiveFileTransferTypeResponse()
         if chunksize == ERROR_CODE:
@@ -63,12 +60,12 @@ class ClientStopAndWait:
             header, payload = Packet.unpack_file_transfer_type_response(received_message)
             return payload['chunksize']
         else:
-            if opcode == FILE_NO_DISK_SPACE_OPCODE:
+            if opcode == NO_DISK_SPACE_OPCODE:
                 print('Not enough disk space in server to upload file')
             elif opcode == FILE_TOO_BIG_OPCODE:
                 print('File too big, not supported by protocol')
             elif opcode == FILE_ALREADY_EXISTS_OPCODE:
-                print('The file that is trying to upload already exists in the server')
+                print('The file that you are trying to upload already exists in the server')
             else:
                 print('Uknown error, retry')
             return ERROR_CODE
