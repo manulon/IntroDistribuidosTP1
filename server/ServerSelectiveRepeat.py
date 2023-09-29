@@ -67,11 +67,14 @@ class ServerSelectiveRepeat:
         file = {}
         totalPackets = filesize / CHUNKSIZE
         distinctAcksSent = 0
-        # Perdon por esta variable, no se me ocurria otra manera
         firstIteration = True
 
         for i in range(1,10):
             self.window.append({'nseq': i, 'isACKSent': False})
+
+        # VARIABLE PARA TESTEAR #
+        enviarElACK6 = False
+        # VARIABLE PARA TESTEAR #
 
         while distinctAcksSent != totalPackets:
             if not firstIteration:
@@ -80,13 +83,20 @@ class ServerSelectiveRepeat:
                 firstIteration = False
 
             if self.isChecksumOK(header, payload):
-                self.sendACK(header['nseq'])
+                # ESTO ESTA PARA TESTEAR, SI HAY QUE SACAR EL 
+                # IF Y LUEGO DEJAR SOLO LA LINEA 
+                # 'self.sendACK(header['nseq'])'
+                if header['nseq'] == 6 and (not enviarElACK6):
+                    print('### NO VOY A ENVIAR EL ACK 6 ###')
+                    enviarElACK6 = True
+                else:
+                    self.sendACK(header['nseq'])
             
             for e in self.window:
                 if (not e['isACKSent']) and header['nseq'] == e['nseq']:
                     e['isACKSent'] = True
                     distinctAcksSent += 1
-            file[header['nseq'] - 1] = payload
+                    file[header['nseq'] - 1] = payload
                   
             if header['nseq'] == self.window[0]['nseq']:
                 self.moveWindow()
