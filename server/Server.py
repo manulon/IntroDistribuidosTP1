@@ -14,16 +14,16 @@ class Server():
     def receive(self):
         print('The server is ready to receive')
         while True:
-            received_message, (clientAddress, clientPort) = self.socket.receive(FILE_TRANSFER_REQUEST_SIZE)
-            opcode = int.from_bytes(received_message[:1], BYTEORDER)
-            match opcode:
+            firstPacketIsValid = False
+            while not firstPacketIsValid:
+                firstPacketIsValid, header, payload, clientAddress, clientPort = self.receiveFirstPacket()
+            
+            match header['opcode']:
                 case 0: # Upload
-                    header, payload = Packet.unpack_upload_request(received_message)
                     if payload['protocol'] == 1:
                         print('Seleccionaste Selective Repeat')
                         protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort)
                         self.protocol = protocol
-                        self.protocol.sendFileTransferTypeResponse()
                         self.protocol.upload(payload['fileSize'])
                     else:
                         print('Seleccionaste Stop and Wait')
@@ -40,6 +40,19 @@ class Server():
                     # close connection
                     break
             #modifiedMessage = message.decode().upper()
+
+    def receiveFirstPacket(self):
+        received_message, (clientAddress, clientPort) = self.socket.receive(FILE_TRANSFER_REQUEST_SIZE)
+        header, payload = Packet.unpack_upload_request(received_message)
+
+        firstPacketIsValid = self.isChecksumOK(header, payload)
+
+        return firstPacketIsValid, header, payload, clientAddress, clientPort
+
+    def isChecksumOK(self, header, payload):
+        # AGREGAR LÓGICA PARA RE-CALCULAR EL CHECKSUM
+        checksumCalculado = 2
+        return header['checksum'] == checksumCalculado
 
     def close(self):
         self.socket.close()
