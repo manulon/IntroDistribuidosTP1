@@ -23,14 +23,28 @@ class ServerSelectiveRepeat:
         # chunksize fijo (4096 bytes)
         chunksize = CHUNKSIZE.to_bytes(4, BYTEORDER)
 
+        # VARIABLE PARA TESTEAR #
+        esLaPrimeraVezQueMandoEstePaquete = True
+        # VARIABLE PARA TESTEAR #
+
         message = Packet.pack_file_transfer_type_response(header, chunksize)
-        self.send(message)
+        if esLaPrimeraVezQueMandoEstePaquete:
+            esLaPrimeraVezQueMandoEstePaquete = False
+            print('No estoy enviando el paquete 0001')
+        else:
+            # A ESTE ELSE NUNCA VA A ENTRAR, POR LO QUE
+            # TENDRA QUE EJECUTARSE EL SEND DE LA LINEA 43
+            # ESTE IF DEBE BORRARSE CUANDO SE ELIMINE LA 
+            # VARIABLE Y DEJAR SOLAMENTE EL self.send(message)
+            self.send(message)
 
         nextPacketIsADataPacket = False
+
         receivedPacketHeader, receivedPacketPayload = self.receivePackage()
 
         while not nextPacketIsADataPacket:
-            if receivedPacketHeader['opcode'] == 1:
+            if receivedPacketHeader['opcode'] == 0:
+                print('Ahora si, envio el paquete 0001')
                 self.send(message)
                 receivedPacketHeader, receivedPacketPayload = self.receivePackage()
             else:
@@ -85,7 +99,10 @@ class ServerSelectiveRepeat:
     def receivePackage(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(PACKET_SIZE)
 
-        header, payload = Packet.unpack_package(received_message)
+        if Utils.bytesToInt(received_message[:1]) == 0:
+            header, payload = Packet.unpack_upload_request(received_message)
+        else:
+            header, payload = Packet.unpack_package(received_message)
 
         return header, payload
 

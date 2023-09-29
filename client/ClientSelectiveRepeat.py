@@ -135,7 +135,7 @@ class ClientSelectiveRepeat:
 
     def receiveFileTransferTypeResponse(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
-        
+
         header, payload = Packet.unpack_file_transfer_type_response(received_message)
 
         self.chunksize = payload['chunksize']
@@ -152,9 +152,9 @@ class ClientSelectiveRepeat:
         header = (opcode, checksum, nseqToBytes)
 
         message = Packet.pack_package(header, payload)
+        print('Enviaré un paquete con nseq: ', nseq)
         self.send(message)
-        print('Envié el paquete con nseq: ', nseq)
-
+        
     def receiveACK(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(ACK_SIZE)
 
