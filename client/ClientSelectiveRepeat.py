@@ -1,6 +1,9 @@
+import time
 from common.Packet import Packet
 from common.Utils import Utils
 from common.constants import *
+
+
 
 class ClientSelectiveRepeat:
 
@@ -11,6 +14,7 @@ class ClientSelectiveRepeat:
         self.protocolID = bytes([0x1])
         self.window = []
         self.chunksize = None
+        self.retries = False
   
     def setServerInfo(self, serverAddress, serverPort, socket):
         self.serverAddress = serverAddress
@@ -53,30 +57,42 @@ class ClientSelectiveRepeat:
         packetsPushed = 0
         nseq = 1
         payloadWithNseq = {}
+        socketTimeouts = 0
 
-        while packetsACKed != totalPackets:
+        while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
             while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
                 payloadAux = archivo[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
                 payloadWithNseq[nseq] = payloadAux
-                self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False})
+                self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})
                 packetsPushed += 1
                 nseq += 1
             
-            for packet in self.window:
-                if not packet['isSent']:
-                    self.sendPackage(payloadWithNseq[packet['nseq']], packet['nseq'])
-                    packet['isSent'] = True
+            for e in self.window:
+                if not e['isSent']:
+                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    e['sentAt'] = time.time()
+                    e['isSent'] = True
             
-            ackReceived = self.receiveACK()
+            try:
+                self.socket.settimeout(0.2)
+                ackReceived = self.receiveACK()
+                socketTimeouts = 0
+            except TimeoutError:
+                socketTimeouts += 1
 
-            for packet in self.window:
-                if ackReceived == packet['nseq']:
-                    packet['isACKed'] = True
-                    packetsACKed += 1
-
+            for e in self.window:
+                if (not e['isACKed']) and ackReceived == e['nseq']:
+                    e['isACKed'] = True
+                    packetsACKed += 1  
+                if (not e['isACKed']) and (time.time() - e['sentAt'] > 2):
+                    print('--- TIMEOUT Y RETRANSMISION DEL PACKET:', e['nseq'], '---')
+                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    e['sentAt'] = time.time()
             
             if self.window[0]['isACKed']:
                 self.moveWindow()
+
+        print('packetsACKed: ', packetsACKed, 'socketTimeouts: ', socketTimeouts)
 
     def sendUploadRequest(self, fileName):
         opcode = bytes([0x0])
@@ -101,19 +117,25 @@ class ClientSelectiveRepeat:
         self.chunksize = payload['chunksize']
         
     def sendPackage(self, payload, nseq):
-       opcode = bytes([0x4])
-       checksum = (2).to_bytes(4, BYTEORDER)
-       nseqToBytes = nseq.to_bytes(4, BYTEORDER)
-       header = (opcode, checksum, nseqToBytes)
+        opcode = bytes([0x4])
 
-       message = Packet.pack_package(header, payload)
-       self.send(message)
+        checksum = (2).to_bytes(4, BYTEORDER)
+        if nseq == 10 and not self.retries:
+            checksum = (0).to_bytes(4, BYTEORDER)
+            self.retries = True
+           
+        nseqToBytes = nseq.to_bytes(4, BYTEORDER)
+        header = (opcode, checksum, nseqToBytes)
+
+        message = Packet.pack_package(header, payload)
+        self.send(message)
+        print('Envié el paquete con nseq: ', nseq)
 
     def receiveACK(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
-
+        print('Recibi el ack: ', header['nseq'])
         return header['nseq']
 
     def moveWindow(self):
@@ -122,4 +144,3 @@ class ClientSelectiveRepeat:
 
     def download(self, filename):
         pass
-

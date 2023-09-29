@@ -29,20 +29,20 @@ class ServerSelectiveRepeat:
     def upload(self, filesize):
         file = {}
         totalPackets = filesize / CHUNKSIZE
-        acksSent = 0
-        for i in range(10):
+        distinctAcksSent = 0
+        for i in range(1,10):
             self.window.append({'nseq': i, 'isACKSent': False})
 
-        while acksSent != totalPackets:
+        while distinctAcksSent != totalPackets:
             header, payload = self.receivePackage()
 
             if self.isChecksumOK(header, payload):
                 self.sendACK(header['nseq'])
             
             for e in self.window:
-                if header['nseq'] == e['nseq']:
-                    e['isACKSent'] == True
-            acksSent += 1
+                if (not e['isACKSent']) and header['nseq'] == e['nseq']:
+                    e['isACKSent'] = True
+                    distinctAcksSent += 1
             file[header['nseq'] - 1] = payload
                   
             if header['nseq'] == self.window[0]['nseq']:
@@ -70,9 +70,9 @@ class ServerSelectiveRepeat:
         self.send(message)
 
     def moveWindow(self):
-        while self.window.length() != 0 and self.window[0].isACKSent == True:
-            lastNseq = self.window[-1].nseq
-            self.window.pop()
+        while len(self.window) != 0 and self.window[0]['isACKSent']:
+            lastNseq = self.window[-1]['nseq']
+            self.window.pop(0)
             self.window.append({'nseq': lastNseq + 1, 'isACKSent': False})
 
     def showFile(self, file):
