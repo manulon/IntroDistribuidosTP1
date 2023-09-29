@@ -3,6 +3,7 @@ from common.Socket import Socket
 from common.Packet import Packet
 from common.constants import *
 from server.ServerSelectiveRepeat import *
+from server.ServerStopAndWait import *
 
 class Server():
     MAX_FILE_SIZE = 4000000000 # 4GB
@@ -29,7 +30,10 @@ class Server():
                         self.protocol.upload(payload['fileSize'])
                     else:
                         print('Seleccionaste Stop and Wait')
-                    #StopAndWait.upload(payload['fileName'], payload['fileSize'], payload['md5'])
+                        protocol = ServerStopAndWait(self.socket, clientAddress, clientPort)
+                        self.protocol = protocol
+                        self.protocol.sendFileTransferTypeResponse()
+                        self.protocol.upload(payload['fileSize'])
                     break
                 case 2: # Download
                     #print('downloading (stop and wait): '+ str(message))

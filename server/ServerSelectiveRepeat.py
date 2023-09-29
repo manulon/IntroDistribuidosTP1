@@ -8,7 +8,7 @@ class ServerSelectiveRepeat:
         self.socket = socket
         self.clientAddress = clientAddress
         self.clientPort = clientPort
-        self.protocolID = bytes([0x1])
+        self.protocolID = bytes([SELECTIVE_REPEAT])
         self.window = []
 
     def send(self, message):
@@ -20,7 +20,7 @@ class ServerSelectiveRepeat:
         nseq = (0).to_bytes(4, BYTEORDER)
         header = (opcode, checksum, nseq)
 
-        # chunksize fijo (4096 bytes)
+        # fixed chunksize (4096 bytes)
         chunksize = CHUNKSIZE.to_bytes(4, BYTEORDER)
 
         message = Packet.pack_file_transfer_type_response(header, chunksize)
@@ -58,7 +58,7 @@ class ServerSelectiveRepeat:
         return header, payload
 
     def sendACK(self, nseq):
-        opcode = bytes([0x5])
+        opcode = bytes([ACK_OPCODE])
         checksum = (2).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         header = (opcode, checksum, nseqToBytes)

@@ -12,6 +12,10 @@ BYTEORDER = byteorder = sys.byteorder
 
 '''Protocolo'''
 CHUNKSIZE = 4096
+SELECTIVE_REPEAT = 0x1
+STOP_AND_WAIT = 0x2
+
+ACK_OPCODE = 0x5
 
 '''Paquetes'''
 REQUEST_CONTENT = "20s"
