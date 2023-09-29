@@ -84,7 +84,7 @@ class ClientSelectiveRepeat:
                 if (not e['isACKed']) and ackReceived == e['nseq']:
                     e['isACKed'] = True
                     packetsACKed += 1  
-                if (not e['isACKed']) and (time.time() - e['sentAt'] > 2):
+                if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
                     print('--- TIMEOUT Y RETRANSMISION DEL PACKET:', e['nseq'], '---')
                     self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
