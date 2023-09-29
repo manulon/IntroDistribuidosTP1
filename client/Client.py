@@ -12,6 +12,9 @@ class Client:
 
     def upload(self, filename):
         self.protocol.upload(filename)
+    
+    def download(self, filename):
+        self.protocol.download(filename)
 
     def setProtocol(self, protocol):
         protocol.setServerInfo(self.serverAddress, self.serverPort, self.socket)
