@@ -28,7 +28,19 @@ class ClientSelectiveRepeat:
         initCommunicationSocketTimeout = 0
         communicationStarted = False
 
-        self.sendUploadRequest(filename)
+        #######################################
+        #        FAKE STRING BYTES            #
+        #######################################
+        with open(filename, 'rb') as f:
+            archivo = f.read()
+
+        # VER COMO LO CONSEGUIMOS XD
+        filesize = len(archivo)
+        #######################################
+        #        FAKE STRING BYTES            #
+        #######################################
+
+        self.sendUploadRequest(filename, filesize)
         firstPacketSentTime = time.time()
 
         while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
@@ -44,20 +56,6 @@ class ClientSelectiveRepeat:
                 self.sendUploadRequest(filename)
                 firstPacketSentTime = time.time()
 
-
-        #######################################
-        #        FAKE STRING BYTES            #
-        #######################################
-        archivo = b''
-        cantidadPaquetes = 31
-        for i in range(cantidadPaquetes):
-            archivo += Utils.bytesNumerados(self.chunksize, i)
-        #######################################
-        #        FAKE STRING BYTES            #
-        #######################################
-
-        # VER COMO LO CONSEGUIMOS XD
-        filesize = 4096*31
         totalPackets = math.ceil(filesize / CHUNKSIZE)
         packetsACKed = 0
         packetsPushed = 0
@@ -102,7 +100,7 @@ class ClientSelectiveRepeat:
 
         print('La transferencia ha finalizado')
 
-    def sendUploadRequest(self, fileName):
+    def sendUploadRequest(self, fileName, filesize):
         opcode = bytes([0x0])
         checksum = (2).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
@@ -110,15 +108,18 @@ class ClientSelectiveRepeat:
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        fileSize = (4096*31).to_bytes(16, BYTEORDER)       # 16 bytes 
-        md5      = Utils.bytes(16)                         # 16 bytes vacíos
+        fileSize = filesize.to_bytes(16, BYTEORDER)         # 16 bytes 
+        md5      = Utils.bytes(16)                          # 16 bytes vacíos
         payload  = (protocol, fileName, fileSize, md5)
 
         message = Packet.pack_upload_request(header, payload)
         self.send(message)
 
     def receiveFileTransferTypeResponse(self):
-        received_message, (serverAddres, serverPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+        received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+
+        self.serverAddress = udpServerThreadAddress
+        self.serverPort = udpServerThreadPort
 
         header, payload = Packet.unpack_file_transfer_type_response(received_message)
 

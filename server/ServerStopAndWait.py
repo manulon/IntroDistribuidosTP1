@@ -26,3 +26,5 @@ class StopAndWait:
     def download(self, filename):
         pass
 
+    def stopSocket(self):
+        self.socket.close()

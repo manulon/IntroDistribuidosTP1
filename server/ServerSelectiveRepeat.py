@@ -66,6 +66,7 @@ class ServerSelectiveRepeat:
                 if (not e['isACKSent']) and header['nseq'] == e['nseq']:
                     e['isACKSent'] = True
                     distinctAcksSent += 1
+                    print(distinctAcksSent)
                     file[header['nseq'] - 1] = payload
                   
             if header['nseq'] == self.window[0]['nseq']:
@@ -154,3 +155,6 @@ class ServerSelectiveRepeat:
            if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > SELECTIVE_REPEAT_PACKET_TIMEOUT):
                 self.send(message)
                 stopFileTransferMsgSentAt = time.time()            
+
+    def closeSocket(self):
+        self.socket.close()

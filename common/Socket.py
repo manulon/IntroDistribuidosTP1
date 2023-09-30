@@ -19,3 +19,9 @@ class Socket:
 
     def settimeout(self, time):
         self.socket.settimeout(time)
+
+    def getPort(self):
+        return self.port
+    
+    def getAddress(self):
+        return self.address
