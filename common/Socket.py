@@ -6,6 +6,7 @@ class Socket:
         self.address = address
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.socket.bind(('', self.port))
+        self.isSocketOpen = True
 
     def send(self, msg, address, port):
         self.socket.sendto(msg, (address, port))
@@ -16,6 +17,7 @@ class Socket:
 
     def close(self):
         self.socket.close()
+        self.isSocketOpen = False
 
     def settimeout(self, time):
         self.socket.settimeout(time)
@@ -25,3 +27,6 @@ class Socket:
     
     def getAddress(self):
         return self.address
+    
+    def isOpen(self):
+        return self.isSocketOpen
