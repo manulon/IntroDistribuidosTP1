@@ -31,7 +31,6 @@ class UDPConnectionAceptorThread(threading.Thread):
                         match payload['protocol']:
                             case 0: # STOP & WAIT
                                 print('Seleccionaste stop and wait')
-                                break
                             case 1: # SELECTIVE REPEAT    
                                 print('Seleccionaste Selective Repeat')
 
@@ -43,7 +42,6 @@ class UDPConnectionAceptorThread(threading.Thread):
                                 )
                                 self.clients[(clientAddress, clientPort)].start()
                                 print('Mi cliente terminó')
-                                break
                 except:
                     print('Tiro except, no me importa nada igual')
                 #modifiedMessage = message.decode().upper()
