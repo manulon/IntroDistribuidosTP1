@@ -2,6 +2,8 @@ from socket import *
 from common.Socket import Socket
 from common.Packet import Packet
 from common.constants import *
+from common.Logger import *
+from common.Checksum import *
 from server.ServerSelectiveRepeat import *
 
 class Server():
@@ -36,7 +38,7 @@ class Server():
                     #StopAndWait.list(message)
                     break
                 case default:
-                    # print("message not understood")
+                    Logger.LogError(f"The value {header['opcode']} is not a valid opcode")
                     # close connection
                     break
             #modifiedMessage = message.decode().upper()
@@ -50,9 +52,12 @@ class Server():
         return firstPacketIsValid, header, payload, clientAddress, clientPort
 
     def isChecksumOK(self, header, payload):
-        # AGREGAR LÓGICA PARA RE-CALCULAR EL CHECKSUM
-        checksumCalculado = 2
-        return header['checksum'] == checksumCalculado
+        Logger.LogDebug(f"{header}")
+        opcode = header['opcode'].to_bytes(1, BYTEORDER)
+        checksum = (header['checksum']).to_bytes(4, BYTEORDER)
+        nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
+        
+        return Checksum.is_checksum_valid(checksum + opcode  + nseqToBytes, len(opcode + checksum + nseqToBytes))
 
     def close(self):
         self.socket.close()
