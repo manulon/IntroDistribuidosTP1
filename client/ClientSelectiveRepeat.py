@@ -53,7 +53,7 @@ class ClientSelectiveRepeat:
                 initCommunicationSocketTimeout += 1
 
             if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                self.sendUploadRequest(filename)
+                self.sendUploadRequest(filename, filesize)
                 firstPacketSentTime = time.time()
 
         totalPackets = math.ceil(filesize / CHUNKSIZE)

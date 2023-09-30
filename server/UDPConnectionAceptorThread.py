@@ -15,54 +15,37 @@ class UDPConnectionAceptorThread(threading.Thread):
         self.serverAddress = serverSocket.getAddress()
 
     def run(self):
-        print('0')
         while self.allowedToRun:
-            print('1')
-            print('2')
             firstPacketIsValid = False
-            while not firstPacketIsValid:
-                print('3')
-                
-                if self.serverSocket.isOpen():
-                    self.serverSocket.settimeout(0.2)
-
+            if not firstPacketIsValid:
                 try:
+                    self.serverSocket.settimeout(0.2)
                     firstPacketIsValid, header, payload, clientAddress, clientPort = self.receiveFirstPacket()
+                    if firstPacketIsValid:
+                        if (clientAddress, clientPort) not in self.clients:
+                            print(
+                                f"{COLOR_BLUE}[INFO]"
+                                f"{COLOR_END}"
+                                f" - New UDP Client {clientAddress}"
+                                f":{clientPort} connected.")
+                        match payload['protocol']:
+                            case 0: # STOP & WAIT
+                                print('Seleccionaste stop and wait')
+                                break
+                            case 1: # SELECTIVE REPEAT    
+                                print('Seleccionaste Selective Repeat')
+
+                                self.lastSocketPort += 1
+                                newSocket = Socket(self.lastSocketPort, self.serverAddress)
+                                self.clients[(clientAddress, clientPort)] = UDPServerThread(
+                                    ServerSelectiveRepeat(newSocket, clientAddress, clientPort),
+                                    header, payload
+                                )
+                                self.clients[(clientAddress, clientPort)].start()
+                                print('Mi cliente terminó')
+                                break
                 except:
-                    pass
-                print('4')
-                if firstPacketIsValid:
-                    if (clientAddress, clientPort) not in self.clients:
-                        print('5')
-                        print(
-                            f"{COLOR_BLUE}[INFO]"
-                            f"{COLOR_END}"
-                            f" - New UDP Client {clientAddress}"
-                            f":{clientPort} connected.")
-                        print('6')
-                    match payload['protocol']:
-                        case 0: # STOP & WAIT
-                            print('7')
-                            print('Seleccionaste stop and wait')
-                            print('8')
-                            break
-                        case 1: # SELECTIVE REPEAT    
-                            print('9')
-                            print('Seleccionaste Selective Repeat')
-                            
-                            self.lastSocketPort += 1
-                            print('10')
-                            newSocket = Socket(self.lastSocketPort, self.serverAddress)
-                            print('11')
-                            self.clients[(clientAddress, clientPort)] = UDPServerThread(
-                                ServerSelectiveRepeat(newSocket, clientAddress, clientPort),
-                                header, payload
-                            )
-                            print('12')
-                            self.clients[(clientAddress, clientPort)].start()
-                            print('13')
-                            print('Mi cliente terminó')
-                            break
+                    print('Tiro except, no me importa nada igual')
                 #modifiedMessage = message.decode().upper()
         print('Sali del while de conexion aceptador')
 

@@ -46,7 +46,6 @@ def main(argv):
 
     server = Server(host_service_ip_address, port_service_port)
     server.start()
-    #server.close()
-
+    server.close()
 if __name__ == '__main__':
     main(sys.argv[1:])
