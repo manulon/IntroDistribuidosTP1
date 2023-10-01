@@ -32,6 +32,7 @@ def main(argv):
             print("  -H, --host     service IP address")
             print("  -p, --port     service port")
             print("  -s, --storage  storage dir path")
+            sys.exit(0)
         
         # VERBOSE
         elif opt in ("-v", "--verbose"):
@@ -62,7 +63,8 @@ def main(argv):
 
 
     server = Server(host_service_ip_address, port_service_port, storage)
-    server.receive()
+    server.start()
+    server.close()
 
 if __name__ == '__main__':
     main(sys.argv[1:])

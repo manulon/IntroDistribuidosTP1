@@ -72,21 +72,23 @@ class ClientSelectiveRepeat:
                 self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
                 packetsPushed += 1
                 nseq += 1
-                Logger.LogDebug(f"Sending packet: {packetsPushed} sequence: {nseq}")
             
             for e in self.window:
                 if not e['isSent']:
+                    Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
                     self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
                     e['isSent'] = True
             
+            ackReceived = None
+
             try:
                 self.socket.settimeout(0.2)
                 ackReceived = self.receiveACK()
                 socketTimeouts = 0
             except TimeoutError:                
                 socketTimeouts += 1
-                Logger.LogWarning(f"There has been a socket timeout (number: {initCommunicationSocketTimeout})")
+                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
             except:
                 Logger.LogError("There has been an error receiving the ACK")
 
@@ -96,7 +98,10 @@ class ClientSelectiveRepeat:
                     packetsACKed += 1
                     Logger.LogDebug(f"ACKed {packetsACKed} packets")  
                 if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    if (e['nseq'] != totalPackets):
+                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    else:
+                        self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
             
             if self.window[0]['isACKed']:
@@ -124,7 +129,10 @@ class ClientSelectiveRepeat:
         self.send(message)
 
     def receiveFileTransferTypeResponse(self):
-        received_message, (serverAddres, serverPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+        received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+
+        self.serverAddress = udpServerThreadAddress
+        self.serverPort = udpServerThreadPort
 
         header, payload = Packet.unpack_file_transfer_type_response(received_message)
         self.chunksize = payload['chunksize']
@@ -139,7 +147,7 @@ class ClientSelectiveRepeat:
 
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_package(header, payload)
-        Logger.LogInfo(f"About to send packet nsqe: {nseq}")
+        Logger.LogInfo(f"About to send packet nseq: {nseq}")
         self.send(message)
         
     def receiveACK(self):
@@ -181,7 +189,19 @@ class ClientSelectiveRepeat:
         
         self.send(message)
 
-        print('Finalized uploading file.')
+
+        print('Finalized uploading file')
+
+    def sendLastPackage(self, payload, nseq):
+        opcode = bytes([0x4])
+
+        checksum = (2).to_bytes(4, BYTEORDER)
+           
+        nseqToBytes = nseq.to_bytes(4, BYTEORDER)
+        header = (opcode, checksum, nseqToBytes)
+
+        message = Packet.pack_package(header, payload)
+        self.send(message)
 
     def download(self, filename):
         pass

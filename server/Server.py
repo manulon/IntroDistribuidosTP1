@@ -5,6 +5,8 @@ from common.constants import *
 from common.Logger import *
 from common.Checksum import *
 from server.ServerSelectiveRepeat import *
+from server.UDPConnectionAceptorThread import *
+
 
 class Server():
     def __init__(self, address, port, storage):
@@ -12,53 +14,37 @@ class Server():
         self.address = address
         self.socket = Socket(self.port, self.address)
         self.protocol = None
+        self.clients = {}
+        self.connectionAceptorThread = None
         self.storage = storage
 
-    def receive(self):
-        print('The server is ready to receive')
-        while True:
-            firstPacketIsValid = False
-            while not firstPacketIsValid:
-                firstPacketIsValid, header, payload, clientAddress, clientPort = self.receiveFirstPacket()
-            
-            match header['opcode']:
-                case 0: # Upload
-                    if payload['protocol'] == 1:
-                        print('Seleccionaste Selective Repeat')
-                        protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort, self.storage)
-                        self.protocol = protocol
-                        self.protocol.upload(payload['fileSize'],payload['fileName'], payload['md5'])
-                    else:
-                        print('Seleccionaste Stop and Wait')
-                    break
-                case 2: # Download
-                    #print('downloading (stop and wait): '+ str(message))
-                    #StopAndWait.download()
-                    break
-                case 7: # List
-                    #StopAndWait.list(message)
-                    break
-                case default:
-                    Logger.LogError(f"The value {header['opcode']} is not a valid opcode")
-                    # close connection
-                    break
-            #modifiedMessage = message.decode().upper()
-
-    def receiveFirstPacket(self):
-        received_message, (clientAddress, clientPort) = self.socket.receive(FILE_TRANSFER_REQUEST_SIZE)
-        header, payload = Packet.unpack_upload_request(received_message)
-
-        firstPacketIsValid = self.isChecksumOK(header, payload)
-
-        return firstPacketIsValid, header, payload, clientAddress, clientPort
-
-    def isChecksumOK(self, header, payload):
-        Logger.LogDebug(f"{header}")
-        opcode = header['opcode'].to_bytes(1, BYTEORDER)
-        checksum = (header['checksum']).to_bytes(4, BYTEORDER)
-        nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
+    def start(self):
+        #if self.verbosity >= 1:
+        self.startServer()
         
-        return Checksum.is_checksum_valid(checksum + opcode  + nseqToBytes, len(opcode + checksum + nseqToBytes))
+        print("\033[1mTo close the server type 'q':\033[0m")
+        while True:
+            user_input = input()
+            if user_input == 'q':
+                print(f"{COLOR_BLUE}[INFO]{COLOR_END}"
+                     " - Closing the Server...")
+                
+                self.connectionAceptorThread.force_stop()
+                self.connectionAceptorThread.join()
+                
+                print(f"{COLOR_BLUE}[INFO]{COLOR_END}"
+                    " - The Server has been succesfully closed.")
+                break
+            else:
+                print("\033[1mThe key entered is invalid. To close the server type 'q':\033[0m")
+
+    def startServer(self):
+        print(f"{COLOR_BLUE}[INFO]{COLOR_END}"f" - Starting the Server...")
+
+        self.connectionAceptorThread = UDPConnectionAceptorThread(self.socket, self.clients, self.storage)
+        self.connectionAceptorThread.start()
+
+        print(f"{COLOR_BLUE}[INFO]{COLOR_END}"" - UDP Server started.")
 
     def close(self):
         self.socket.close()

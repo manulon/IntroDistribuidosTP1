@@ -10,7 +10,7 @@ from common.Logger import Logger
 def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
     host_service_ip_address = "localhost"  # por defecto localhost
-    port_service_port = 16001  # por defecto 16001
+    port_service_port = 15000  # por defecto 15000
     storage = ""
     file_name = None
     
