@@ -22,7 +22,7 @@ class ServerSelectiveRepeat:
         self.socket.send(message, self.clientAddress, self.clientPort)
 
     def sendFileTransferTypeResponse(self):
-        opcode = bytes([0x0])
+        opcode = bytes([FILE_TRANSFER_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
@@ -147,7 +147,7 @@ class ServerSelectiveRepeat:
         return Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes))
     
     def stopFileTransfer(self, nseq, fileName, originalMd5):
-        opcode = bytes([0x6])
+        opcode = bytes([STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
@@ -162,9 +162,9 @@ class ServerSelectiveRepeat:
         Logger.LogDebug(f"File server MD5: \t{md5.hexdigest()}")
         Logger.LogDebug(f"Client's MD5: \t\t{originalMd5.hex()}")        
         
-        state = bytes([0x0]) # Not okay by default
+        state = bytes([STATE_ERROR]) # Not okay by default
         if md5.hexdigest() == originalMd5.hex():
-            state = bytes([0x1])
+            state = bytes([STATE_OK])
 
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)

@@ -47,10 +47,9 @@ class Server():
                         self.protocol.upload(payload['fileSize'],payload['fileName'], payload['md5'])
                     else:
                         print('Selected Stop and Wait')
-                        protocol = ServerStopAndWait(self.socket, clientAddress, clientPort)
+                        protocol = ServerStopAndWait(self.socket, clientAddress, clientPort, self.storage)
                         self.protocol = protocol
-                        self.protocol.sendFileTransferTypeResponse()
-                        self.protocol.upload(payload['fileSize'])
+                        self.protocol.upload(payload['fileSize'],payload['fileName'], payload['md5'])
                     break
                 case 2: # Download
                     #print('downloading (stop and wait): '+ str(message))

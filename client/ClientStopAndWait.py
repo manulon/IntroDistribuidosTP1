@@ -1,3 +1,7 @@
+import hashlib
+import math
+from common.Checksum import Checksum
+from common.Logger import Logger
 from common.Packet import Packet
 from common.Utils import Utils
 from common.constants import *
@@ -15,23 +19,34 @@ class ClientStopAndWait:
         self.socket = socket
 
     def upload(self, filename):
-        self.uploadRequest(filename)
+        Logger.LogInfo (f"About to start uploading: {filename}")
+
+        file:bytes        
+        with open(filename, 'rb') as file:
+            file = file.read()
+            
+        md5 = hashlib.md5(file)
+        filesize = len(file)
+        
+        self.sendUploadRequest(filename, filesize, md5.digest())
         chunksize = self.receiveFileTransferTypeResponse()
         if chunksize == ERROR_CODE:
             return
-        self.sendFile(filename, chunksize)
+        
+        totalPackets = math.ceil(filesize / chunksize)
+        Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
+        self.sendFile(file, chunksize)
 
-    def uploadRequest(self, fileName):
-        opcode = bytes([0x0])
-        checksum = (2).to_bytes(4, BYTEORDER)
-        nseq = (3).to_bytes(1, BYTEORDER)
-        header = (opcode, checksum, nseq)
+    def sendUploadRequest(self, fileName, fileSize, md5):
+        opcode = bytes([UPLOAD_REQUEST_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseq = (0).to_bytes(1, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendUploadRequest')
+        header = (opcode, finalChecksum, nseq)
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        fileSize = (4096*31).to_bytes(16, BYTEORDER)       # 16 bytes 
-        md5 = Utils.bytes(16)                              # 16 bytes vacíos
-        payload = (protocol, fileName, fileSize, md5)
+        payload = (protocol, fileName, (fileSize).to_bytes(16, BYTEORDER), md5)
 
         message = Packet.pack_upload_request(header, payload)
         self.send(message)
@@ -45,13 +60,13 @@ class ClientStopAndWait:
             return payload['chunksize']
         else:
             if opcode == NO_DISK_SPACE_OPCODE:
-                print('Not enough disk space in server to upload file')
+                Logger.LogError('Not enough disk space in server to upload file')
             elif opcode == FILE_TOO_BIG_OPCODE:
-                print('File too big, not supported by protocol')
+                Logger.LogError('File too big, not supported by protocol')
             elif opcode == FILE_ALREADY_EXISTS_OPCODE:
-                print('The file that you are trying to upload already exists in the server')
+                Logger.LogError('The file that you are trying to upload already exists in the server')
             else:
-                print('Uknown error, retry')
+                Logger.LogError('Uknown error, retry')
             return ERROR_CODE
     
         '''
@@ -62,31 +77,31 @@ class ClientStopAndWait:
         print('¡Adios!')
         '''
 
-    def sendFile(self, filename, chunksize):
-        mockFile = b''
-        numberOfPackets = 31
-        for i in range(numberOfPackets):
-            mockFile += Utils.bytesNumerados(chunksize, i)
-        
-        filesize = 4096*31
-        totalPackets = filesize / chunksize
+    def sendFile(self, file, chunksize):
+        fileSize = len(file)
+        totalPackets = fileSize / chunksize
         packetsPushed = 0
 
         while (packetsPushed < totalPackets):
             sequenceNumber = (packetsPushed + 1) % 2 # starts in 1
-            payload = mockFile[packetsPushed * chunksize : (packetsPushed + 1) * chunksize]
+            payload = file[packetsPushed * chunksize : (packetsPushed + 1) * chunksize]
             self.sendPacket(sequenceNumber, payload)
             ackNseq = self.receiveACK()
             if (ackNseq == sequenceNumber):
                 packetsPushed += 1
             else:
                 while(ackNseq != sequenceNumber): # case 4
-                    self.sendPacket(sequenceNumber,payload)
+                    self.sendPacket(sequenceNumber, payload)
                     ackNseq = self.receiveACK()
+
+        self.stopUploading(int(totalPackets + 1))
+
+        print('File transfer has ended.')
+        #Logger.LogInfo(f"Total packets to send: {totalPackets}, nseq: {nseq}, socket timeouts: {socketTimeouts}")
                 
         
     def sendPacket(self, nseq, payload):
-        opcode = bytes([0x4])
+        opcode = bytes([PACKET_OPCODE])
         checksum = (2).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         header = (opcode, checksum, nseqToBytes)
@@ -103,6 +118,28 @@ class ClientStopAndWait:
         received_message, _ = self.socket.receive(ACK_SIZE)
         header = Packet.unpack_ack(received_message)
         return header['nseq']
+    
+    def stopUploading(self, nseq):
+        self.socket.settimeout(None)
+        received_message, (serverAddres, serverPort) = self.socket.receive(STOP_FILE_TRANSFER_SIZE)
+
+        header, payload = Packet.unpack_stop_file_transfer(received_message)
+        Logger.LogInfo(f"Received ACK: {header['nseq']}")
+
+        if payload["state"] == 0:
+            Logger.LogError("There's been an error uploading the file in the server. File corrupt in the server")
+
+        opcode = bytes([FINAL_ACK_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseqToBytes = (header['nseq']).to_bytes(4, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'stopUploading')
+        header = (opcode, finalChecksum, nseqToBytes)
+
+        message = Packet.pack_ack(header)
+        
+        self.send(message)
+
+        print('Finalized uploading file.')
 
 
     def download(self, filename):

@@ -110,7 +110,7 @@ class ClientSelectiveRepeat:
         Logger.LogInfo(f"Total packets to send: {totalPackets}, nseq: {nseq}, socket timeouts: {socketTimeouts}")
 
     def sendUploadRequest(self, fileName, fileSize, md5):
-        opcode = bytes([0x0])
+        opcode = bytes([UPLOAD_REQUEST_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendUploadRequest')
@@ -130,7 +130,7 @@ class ClientSelectiveRepeat:
         self.chunksize = payload['chunksize']
         
     def sendPackage(self, payload, nseq):
-        opcode = bytes([0x4])
+        opcode = bytes([PACKET_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (nseq).to_bytes(4, BYTEORDER)
 
@@ -171,7 +171,7 @@ class ClientSelectiveRepeat:
         if payload["state"] == 0:
             Logger.LogError("There's been an error uploading the file in the server. File corrupt in the server")
 
-        opcode = bytes([0x7])
+        opcode = bytes([FINAL_ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (header['nseq']).to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'stopUploading')
