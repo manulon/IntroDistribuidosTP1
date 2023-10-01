@@ -6,13 +6,14 @@ from server.ServerSelectiveRepeat import *
 
 class UDPConnectionAceptorThread(threading.Thread):
 
-    def __init__(self, serverSocket, clients):
+    def __init__(self, serverSocket, clients, storage):
         threading.Thread.__init__(self)
         self.serverSocket = serverSocket
         self.clients = clients
         self.allowedToRun = True
         self.lastSocketPort = serverSocket.getPort()
         self.serverAddress = serverSocket.getAddress()
+        self.storage = storage
 
     def run(self):
         while self.allowedToRun:
@@ -37,7 +38,7 @@ class UDPConnectionAceptorThread(threading.Thread):
                                 self.lastSocketPort += 1
                                 newSocket = Socket(self.lastSocketPort, self.serverAddress)
                                 self.clients[(clientAddress, clientPort)] = UDPServerThread(
-                                    ServerSelectiveRepeat(newSocket, clientAddress, clientPort),
+                                    ServerSelectiveRepeat(newSocket, clientAddress, clientPort, self.storage),
                                     header, payload
                                 )
                                 self.clients[(clientAddress, clientPort)].start()
@@ -53,9 +54,12 @@ class UDPConnectionAceptorThread(threading.Thread):
         return firstPacketIsValid, header, payload, clientAddress, clientPort
 
     def isChecksumOK(self, header, payload):
-        # AGREGAR LÓGICA PARA RE-CALCULAR EL CHECKSUM
-        checksumCalculado = 2
-        return header['checksum'] == checksumCalculado
+        Logger.LogDebug(f"{header}")
+        opcode = header['opcode'].to_bytes(1, BYTEORDER)
+        checksum = (header['checksum']).to_bytes(4, BYTEORDER)
+        nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
+        
+        return Checksum.is_checksum_valid(checksum + opcode  + nseqToBytes, len(opcode + checksum + nseqToBytes))
 
     def force_stop(self):
         self.allowedToRun = False

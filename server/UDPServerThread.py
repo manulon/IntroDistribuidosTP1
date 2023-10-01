@@ -1,4 +1,5 @@
 import threading
+from common.Logger import *
 
 class UDPServerThread(threading.Thread):
 
@@ -13,19 +14,20 @@ class UDPServerThread(threading.Thread):
         while self.allowedToRun:
             match self.firstPacketHeader['opcode']:
                 case 0: # Upload
-                    self.protocol.upload(self.firstPacketPayload['fileSize'])
+                    self.protocol.upload(self.firstPacketPayload['fileSize'], 
+                                         self.firstPacketPayload['fileName'], 
+                                         self.firstPacketPayload['md5'])
                     self.force_stop()
                 case 2: # Download
                     #print('downloading (stop and wait): '+ str(message))
                     #StopAndWait.download()
-                    break
+                    continue
                 case 7: # List
                     #StopAndWait.list(message)
-                    break
+                    continue
                 case default:
-                    # print("message not understood")
-                    # close connection
-                    break
+                    Logger.LogError(f"The value {self.firstPacketHeader['opcode']} is not a valid opcode")
+                    
             #modifiedMessage = message.decode().upper()
 
     def force_stop(self):

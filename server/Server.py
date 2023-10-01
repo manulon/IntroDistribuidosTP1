@@ -41,7 +41,7 @@ class Server():
     def startServer(self):
         print(f"{COLOR_BLUE}[INFO]{COLOR_END}"f" - Starting the Server...")
 
-        self.connectionAceptorThread = UDPConnectionAceptorThread(self.socket, self.clients)
+        self.connectionAceptorThread = UDPConnectionAceptorThread(self.socket, self.clients, self.storage)
         self.connectionAceptorThread.start()
 
         print(f"{COLOR_BLUE}[INFO]{COLOR_END}"" - UDP Server started.")

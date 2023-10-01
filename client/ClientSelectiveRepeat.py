@@ -72,24 +72,23 @@ class ClientSelectiveRepeat:
                 self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
                 packetsPushed += 1
                 nseq += 1
-                Logger.LogDebug(f"Sending packet: {packetsPushed} sequence: {nseq}")
             
             for e in self.window:
                 if not e['isSent']:
-                    if (e['nseq'] != totalPackets):
-                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                    else:
-                        self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
+                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
                     e['isSent'] = True
             
+            ackReceived = None
+
             try:
                 self.socket.settimeout(0.2)
                 ackReceived = self.receiveACK()
                 socketTimeouts = 0
             except TimeoutError:                
                 socketTimeouts += 1
-                Logger.LogWarning(f"There has been a socket timeout (number: {initCommunicationSocketTimeout})")
+                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
             except:
                 Logger.LogError("There has been an error receiving the ACK")
 
@@ -148,7 +147,7 @@ class ClientSelectiveRepeat:
 
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_package(header, payload)
-        Logger.LogInfo(f"About to send packet nsqe: {nseq}")
+        Logger.LogInfo(f"About to send packet nseq: {nseq}")
         self.send(message)
         
     def receiveACK(self):
@@ -189,6 +188,7 @@ class ClientSelectiveRepeat:
         message = Packet.pack_ack(header)
         
         self.send(message)
+
 
         print('Finalized uploading file')
 
