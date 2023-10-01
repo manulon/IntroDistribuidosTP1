@@ -48,7 +48,13 @@ class ClientStopAndWait:
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        payload = (protocol, fileName, (fileSize).to_bytes(16, const.BYTEORDER), md5)
+        payload = (
+            protocol,
+            fileName,
+            (fileSize).to_bytes(
+                16,
+                const.BYTEORDER),
+            md5)
 
         message = Packet.pack_upload_request(header, payload)
         self.send(message)
@@ -140,7 +146,8 @@ class ClientStopAndWait:
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseqToBytes = (header['nseq']).to_bytes(4, const.BYTEORDER)
         finalChecksum = Checksum.get_checksum(
-            zeroedChecksum + opcode + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'stopUploading')
+            zeroedChecksum + opcode + nseqToBytes, len(
+                opcode + zeroedChecksum + nseqToBytes), 'stopUploading')
         header = (opcode, finalChecksum, nseqToBytes)
 
         message = Packet.pack_ack(header)
