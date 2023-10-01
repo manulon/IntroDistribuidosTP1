@@ -97,7 +97,6 @@ class Packet:
         nseq = header[2]
         
         return struct.pack(HEADER_FORMAT, opcode, checksum, nseq)
-<<<<<<< HEAD
 
     @staticmethod
     def pack_ack(header):
@@ -114,7 +113,6 @@ class Packet:
     @staticmethod
     def pack_no_disk_space_error(header):
         return Packet.pack_header(header)
-=======
     
     @staticmethod
     def pack_stop_file_transfer(header, payload):
@@ -142,4 +140,3 @@ class Packet:
 
         return header, payload
     
->>>>>>> 10dc1a59db17a44c7fbc21d2b62d0ee8a4023195
