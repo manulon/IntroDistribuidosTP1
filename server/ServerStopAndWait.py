@@ -1,13 +1,13 @@
 import hashlib
 import os
 import time
-from common.Logger import *
-from common.Checksum import *
+from common.Logger import Logger
+from common.Checksum import Checksum
 from common.Packet import Packet
 import common.constants as const
 
-class ServerStopAndWait:
 
+class ServerStopAndWait:
     def __init__(self, socket, clientAddress, clientPort, storage):
         self.socket = socket
         self.clientAddress = clientAddress
@@ -22,7 +22,7 @@ class ServerStopAndWait:
         opcode = bytes([const.FILE_TRANSFER_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
-        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
         header = (opcode, finalChecksum, nseq)
 
         # fixed chunksize (4096 bytes)
@@ -42,27 +42,27 @@ class ServerStopAndWait:
         while acksSent < totalPackets:
             header, payload = self.receivePackage()
             if header['nseq'] == nextNseq:
-                #package = Packet.pack_package(header, payload)
-                #if self.isChecksumOK(header, payload):
+                # package = Packet.pack_package(header, payload)
+                # if self.isChecksumOK(header, payload):
                 self.sendACK(header['nseq'])
                 file.append(payload)
                 nextNseq = acksSent % 2
                 acksSent += 1
-                #else:
+                # else:
                 #    Logger.LogError('Checksum error') # client resends packet (corrupted packet)
-            else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
-                self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
+            else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
+                self.sendACK(header['nseq'])  # server only resends ACK (detects duplicate)
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
         Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
         file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
-        Logger.LogWarning(f"Padding removed")
+        Logger.LogWarning("Padding removed")
 
-        #if state == STATE_OK:
+        # if state == STATE_OK:
         self.saveFile(file, fileName)
         md5, state = self.checkFileMD5(fileName, originalMd5)
         self.stopFileTransfer(nextNseq, fileName, md5, state)
-        #self.showFileAsBytes(file)
+        # self.showFileAsBytes(file)
 
     def download(self, filename):
         pass
@@ -71,7 +71,7 @@ class ServerStopAndWait:
         received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
         header, payload = Packet.unpack_package(received_message)
         return header, payload
-    
+
     def sendACK(self, nseq):
         opcode = bytes([const.ACK_OPCODE])
         checksum = (2).to_bytes(4, const.BYTEORDER)
@@ -84,11 +84,11 @@ class ServerStopAndWait:
     def saveFile(self, file, fileName):
         completeName = os.path.join(self.storage, fileName)
         os.makedirs(os.path.dirname(completeName), exist_ok=True)
-        
+
         fileWriter = open(completeName, "wb")
         for i in range(0, len(file)):
             fileWriter.write(file[i])
-        
+
         Logger.LogInfo(f"File written into: {completeName}")
         fileWriter.close()
 
@@ -96,24 +96,24 @@ class ServerStopAndWait:
         opcode = header['opcode'].to_bytes(1, const.BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
-        
+
         return Checksum.is_checksum_valid(checksum + opcode + nseqToBytes + payload, len(opcode + checksum + nseqToBytes + payload))
 
     def stopFileTransfer(self, nseq, fileName, md5, state):
         opcode = bytes([const.STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
-        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
-        
-        #file:bytes
-        #completeName = os.path.join(self.storage, fileName)
-        #with open(completeName, 'rb') as file:
+
+        # file:bytes
+        # completeName = os.path.join(self.storage, fileName)
+        # with open(completeName, 'rb') as file:
         #    file = file.read()
 
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)
-    
+
         self.send(message)
         stopFileTransferMsgSentAt = time.time()
 
@@ -121,39 +121,39 @@ class ServerStopAndWait:
         stopCommunicationSocketTimeout = 0
 
         while (not communicationFinished) and (stopCommunicationSocketTimeout < const.LAST_ACK_PACKET_TIMEOUT):
-           try:
-               self.socket.settimeout(0.2)
-               received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
-               stopCommunicationSocketTimeout = 0
-               communicationFinished = True
-           except TimeoutError:
-               # Acá se da por sentado que el cliente se cerró
-               stopCommunicationSocketTimeout += 1
+            try:
+                self.socket.settimeout(0.2)
+                received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
+                stopCommunicationSocketTimeout = 0
+                communicationFinished = True
+            except TimeoutError:
+                # Acá se da por sentado que el cliente se cerró
+                stopCommunicationSocketTimeout += 1
 
-           if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+            if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
                 self.send(message)
-                stopFileTransferMsgSentAt = time.time()            
+                stopFileTransferMsgSentAt = time.time()
 
     def checkFileMD5(self, fileName, originalMd5):
-        file:bytes
+        file: bytes
         completeName = os.path.join(self.storage, fileName)
         with open(completeName, 'rb') as file:
             file = file.read()
 
         md5 = hashlib.md5(file)
         Logger.LogDebug(f"File server MD5: \t{md5.hexdigest()}")
-        Logger.LogDebug(f"Client's MD5: \t\t{originalMd5.hex()}")        
-        
-        state = bytes([const.STATE_ERROR]) # Not okay by default
+        Logger.LogDebug(f"Client's MD5: \t\t{originalMd5.hex()}")
+
+        state = bytes([const.STATE_ERROR])  # Not okay by default
         if md5.hexdigest() == originalMd5.hex():
             state = bytes([const.STATE_OK])
-        
+
         return md5, state
 
     def showFileAsBytes(self, fileArray):
         content = b''
         for e in fileArray:
-            content += e  
+            content += e
         print('######################')
         print('El archivo se ha descargado! Su contenido es el siguiente:')
         print(content)
