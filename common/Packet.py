@@ -1,6 +1,7 @@
 import struct
 from common.Utils import Utils
 from common.constants import *
+from common.Logger import *
 
 class Packet:
     
@@ -64,6 +65,8 @@ class Packet:
         checksum = header[1]
         nseq = header[2]
         
+        Logger.LogDebug(f"In packet, im about to send packet with size: {len(struct.pack(HEADER_FORMAT + PACKAGE_FORMAT, opcode, checksum, nseq, payload))}")
+
         return struct.pack(HEADER_FORMAT + PACKAGE_FORMAT, opcode, checksum, nseq, payload)
 
     @staticmethod

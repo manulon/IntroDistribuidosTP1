@@ -9,3 +9,7 @@ python3 upload.py -n "lorem-ipsum.txt" -v
 
 # Generar un archivo random de 1Gb 
 base64 /dev/urandom | head -c 1000000000 > file.txt
+
+
+# Instalar librerias externas (sólo para la barra de progreso)
+pip install tqdm

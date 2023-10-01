@@ -54,7 +54,7 @@ class ServerStopAndWait:
                 self.sendACK(header['nseq'])  # server only resends ACK (detects duplicate)
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
-        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
+        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
         file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
         Logger.LogWarning("Padding removed")
 
@@ -157,3 +157,6 @@ class ServerStopAndWait:
         print('######################')
         print('El archivo se ha descargado! Su contenido es el siguiente:')
         print(content)
+
+    def stopSocket(self):
+        self.socket.close()

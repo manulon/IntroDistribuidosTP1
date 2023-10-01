@@ -78,13 +78,13 @@ class ServerSelectiveRepeat:
             if header['nseq'] == self.window[0]['nseq']:
                 self.moveWindow()
 
-        self.stopFileTransfer(totalPackets+1, fileName, originalMd5)
-
         bytesInLatestPacket = filesize % CHUNKSIZE
-        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
+        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
         file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
         Logger.LogWarning(f"Padding removed")
         self.saveFile(file, fileName)
+
+        self.stopFileTransfer(totalPackets+1, fileName, originalMd5)
 
     def download(self, filename):
         pass
@@ -106,6 +106,7 @@ class ServerSelectiveRepeat:
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending ACK {nseq} ")
         self.send(message)
 
     def moveWindow(self):
@@ -138,6 +139,7 @@ class ServerSelectiveRepeat:
         
         Logger.LogInfo(f"File written into: {completeName}")
         fileWriter.close()
+
 
     def isChecksumOK(self, header, payload):
         opcode = header['opcode'].to_bytes(1, BYTEORDER)
@@ -188,3 +190,6 @@ class ServerSelectiveRepeat:
            if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > SELECTIVE_REPEAT_PACKET_TIMEOUT):
                 self.send(message)
                 stopFileTransferMsgSentAt = time.time()            
+
+    def closeSocket(self):
+        self.socket.close()

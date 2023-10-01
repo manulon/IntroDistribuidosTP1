@@ -10,7 +10,7 @@ from common.Logger import Logger
 def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
     host_service_ip_address = "localhost"  # por defecto localhost
-    port_service_port = 16001  # por defecto 16001
+    port_service_port = 15000  # por defecto 15000
     storage = ""
     file_name = None
     
@@ -74,6 +74,9 @@ def main(argv):
             file_name = arg
             if file_name:
                 Logger.LogInfo(f"File name {file_name}")
+            if len(file_name) > 20:
+                Logger.LogError(f"File name too long. It should be 20 characters or less")
+                return
 
     if file_name == None or file_name == "" or not file_name:
         Logger.LogError("No file specified")
