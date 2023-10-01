@@ -12,11 +12,12 @@ from server.ServerSelectiveRepeat import *
 class Server():
     MAX_FILE_SIZE = 4000000000 # 4GB
 
-    def __init__(self, address, port):
+    def __init__(self, address, port, storage):
         self.port = port
         self.address = address
         self.socket = Socket(self.port, self.address)
         self.protocol = None
+        self.storage = storage
 
     def send(self, message):
         self.socket.send(message, self.clientAddress, self.clientPort)
@@ -40,10 +41,10 @@ class Server():
                     #    self.sendFileAlreadyExistsResponse()
                     #    break
                     if payload['protocol'] == 1:
-                        print('Selected Selective Repeat')
-                        protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort)
+                        print('Seleccionaste Selective Repeat')
+                        protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort, self.storage)
                         self.protocol = protocol
-                        self.protocol.upload(payload['fileSize'])
+                        self.protocol.upload(payload['fileSize'],payload['fileName'], payload['md5'])
                     else:
                         print('Selected Stop and Wait')
                         protocol = ServerStopAndWait(self.socket, clientAddress, clientPort)
