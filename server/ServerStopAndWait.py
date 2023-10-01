@@ -25,7 +25,6 @@ class ServerStopAndWait:
         self.send(message)
 
     def upload(self, filesize):
-        file = {}
         totalPackets = filesize / CHUNKSIZE
         acksSent = 0
         nextNseq = 1
