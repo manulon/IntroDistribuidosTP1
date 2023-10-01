@@ -66,7 +66,6 @@ class ServerSelectiveRepeat:
                 if (not e['isACKSent']) and header['nseq'] == e['nseq']:
                     e['isACKSent'] = True
                     distinctAcksSent += 1
-                    print(distinctAcksSent)
                     file[header['nseq'] - 1] = payload
                   
             if header['nseq'] == self.window[0]['nseq']:
@@ -108,16 +107,13 @@ class ServerSelectiveRepeat:
         content = b''
         fileArray = []
         for i in range(len(file)):
-            fileArray.append(file[i])
-
-        for e in fileArray:
-            content += e            
+            content += file[i]      
 
         print('######################')
         print('El archivo se ha descargado! Su contenido es el siguiente:')
         print('######################')
-        print('######################')
         print(content)
+
 
     def isChecksumOK(self, header, payload):
         # AGREGAR LÓGICA PARA RE-CALCULAR EL CHECKSUM

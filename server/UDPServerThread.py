@@ -27,7 +27,6 @@ class UDPServerThread(threading.Thread):
                     # close connection
                     break
             #modifiedMessage = message.decode().upper()
-        print('Sali del while de udp server thread')
 
     def force_stop(self):
         self.allowedToRun = False

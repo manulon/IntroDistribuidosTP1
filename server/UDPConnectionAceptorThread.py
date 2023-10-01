@@ -41,11 +41,8 @@ class UDPConnectionAceptorThread(threading.Thread):
                                     header, payload
                                 )
                                 self.clients[(clientAddress, clientPort)].start()
-                                print('Mi cliente terminó')
                 except:
-                    print('Tiro except, no me importa nada igual')
-                #modifiedMessage = message.decode().upper()
-        print('Sali del while de conexion aceptador')
+                    continue
 
     def receiveFirstPacket(self):
         received_message, (clientAddress, clientPort) = self.serverSocket.receive(FILE_TRANSFER_REQUEST_SIZE)
@@ -61,15 +58,9 @@ class UDPConnectionAceptorThread(threading.Thread):
         return header['checksum'] == checksumCalculado
 
     def force_stop(self):
-        print('¿Entre aca?')
         self.allowedToRun = False
         self.serverSocket.close()
         for k in self.clients.keys():
             self.clients[k].force_stop()
-        print('Estoy seguro que esto se printea')
         for k in self.clients.keys():
-            print('Voy a cerrar el fclente')
             self.clients[k].join()
-            print('¡¡¡¡LOCERRE!!!!')
-
-        print('Supuestamente cerre todo')

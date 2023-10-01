@@ -27,9 +27,7 @@ class Server():
                      " - Closing the Server...")
                 
                 self.connectionAceptorThread.force_stop()
-                print('se viene el terror')
                 self.connectionAceptorThread.join()
-                print('sjajajaja')
                 
                 print(f"{COLOR_BLUE}[INFO]{COLOR_END}"
                     " - The Server has been succesfully closed.")

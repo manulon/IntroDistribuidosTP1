@@ -140,14 +140,12 @@ class ClientSelectiveRepeat:
         header = (opcode, checksum, nseqToBytes)
 
         message = Packet.pack_package(header, payload)
-        print('Enviaré un paquete con nseq: ', nseq)
         self.send(message)
         
     def receiveACK(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
-        print('Recibi el ack: ', header['nseq'])
         return header['nseq']
 
     def moveWindow(self):
@@ -159,7 +157,6 @@ class ClientSelectiveRepeat:
         received_message, (serverAddres, serverPort) = self.socket.receive(STOP_FILE_TRANSFER_SIZE)
 
         header, payload = Packet.unpack_stop_file_transfer(received_message)
-        print('Recibi el ACK: ', header['nseq'])
 
         # Aca va la verificacion del md5 del archivo y el state
 
@@ -182,13 +179,7 @@ class ClientSelectiveRepeat:
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         header = (opcode, checksum, nseqToBytes)
 
-        print('$$$$$$$$$$$$$$$$$$$')
-        print(len(payload))
-        print(payload)
-        print('$$$$$$$$$$$$$$$$$$$')
-
         message = Packet.pack_package(header, payload)
-        print('Enviaré un paquete con nseq: ', nseq)
         self.send(message)
 
     def download(self, filename):
