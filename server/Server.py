@@ -2,18 +2,21 @@ from socket import *
 from common.Socket import Socket
 from common.Packet import Packet
 from common.constants import *
+from common.Logger import *
+from common.Checksum import *
 from server.ServerSelectiveRepeat import *
 from server.UDPConnectionAceptorThread import *
 
 
 class Server():
-    def __init__(self, address, port):
+    def __init__(self, address, port, storage):
         self.port = port
         self.address = address
         self.socket = Socket(self.port, self.address)
         self.protocol = None
         self.clients = {}
         self.connectionAceptorThread = None
+        self.storage = storage
 
     def start(self):
         #if self.verbosity >= 1:

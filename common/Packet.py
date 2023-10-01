@@ -30,7 +30,7 @@ class Packet:
             'protocol': Utils.bytesToInt(protocol),
             'fileName': fileName.decode(),
             'fileSize': Utils.bytesToInt(fileSize),
-            'md5': md5.decode()
+            'md5': md5
         }
 
         return header, payload
@@ -122,7 +122,7 @@ class Packet:
             'nseq': Utils.bytesToInt(nseq)
         }
         payload = {
-            'md5': md5.decode(),
+            'md5': md5,
             'state': Utils.bytesToInt(state)
         }
 

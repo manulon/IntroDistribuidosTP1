@@ -2,9 +2,10 @@
 Repositorio que contiene el trabajo práctico de la materia Introducción a los Sistemas Distribuidos [75.43]
 
 # Server
-python3 start-server.py 
+python3 start-server.py -v -s "./custom_folder"
 
 # Subir un archivo
-python3 upload.py -n "archivo_prueba.txt"
+python3 upload.py -n "lorem-ipsum.txt" -v
 
- 
+# Generar un archivo random de 1Gb 
+base64 /dev/urandom | head -c 1000000000 > file.txt

@@ -41,8 +41,8 @@ def main(argv):
         
         # VERBOSE
         elif opt in ("-v", "--verbose"):
-            Logger.LogInfo("Verbosity will now be set to Debug")
             Logger.SetLogLevel(LOG_LEVEL_DEBUG)
+            Logger.LogInfo("Verbosity will now be set to Debug")
         
          # QUIET
         elif opt in ("-q", "--quiet"):
