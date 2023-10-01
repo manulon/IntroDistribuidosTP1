@@ -157,11 +157,12 @@ class ClientStopAndWait:
         print('Finalized uploading file.')
 
     def download(self, filename):
+        self.sendDownloadRequest(filename)
         '''
             Enviar download request con filename
             Esperar respuesta del servidor
             tomar tamano del archivo y chunksize
-            #seria mucho lujo verificar que haya espacio en disco para la descarga?
+            Verificar si hay espacio en disco para la descarga
             paquetesTotales = tam/chunksize
             md5 = md5 del server
             enviar OK al servidor
@@ -177,3 +178,19 @@ class ClientStopAndWait:
             if mda5 bien
                 ENVIAR ok final y retornar
         '''
+
+    def sendDownloadRequest(self, fileName):
+            opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
+            zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+            nseq = (0).to_bytes(1, const.BYTEORDER)
+            finalChecksum = Checksum.get_checksum(
+                zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequest')
+            header = (opcode, finalChecksum, nseq)
+
+            protocol = self.protocolID
+            fileName = fileName.encode()
+            payload = (
+                protocol,
+                fileName)
+            message = Packet.pack_package(header, payload)
+            self.send(message)
