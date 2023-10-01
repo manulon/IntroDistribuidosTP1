@@ -33,16 +33,15 @@ class ServerStopAndWait:
 
         while acksSent < totalPackets:
             header, payload = self.receivePackage()
-            print(header)
             if header['nseq'] == nextNseq:
-                package = Packet.pack_package(header, payload)
-                if header['checksum'] == Hasher.checksum(package):
-                    self.sendACK(header['nseq'])
-                    file.append(payload)
-                    nextNseq = acksSent % 2
-                    acksSent += 1
-                else:
-                    print('Error de checksum')
+                #package = Packet.pack_package(header, payload)
+                #if header['checksum'] == Hasher.checksum(package):
+                self.sendACK(header['nseq'])
+                file.append(payload)
+                nextNseq = acksSent % 2
+                acksSent += 1
+                #else:
+                    #print('Error de checksum')
                     #self.sendInvalidChecksum()
             else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
                 self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
