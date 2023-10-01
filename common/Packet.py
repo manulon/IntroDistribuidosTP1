@@ -127,3 +127,55 @@ class Packet:
 
         return header, payload
     
+    @staticmethod
+    def pack_download_request(header, payload):
+        opcode = header[0]
+        checksum = header[1]
+        nseq = header[2]
+        protocol = payload[0]
+        fileName = payload[1]
+
+        return struct.pack(HEADER_FORMAT + DOWNLOAD_REQUEST_FORMAT, opcode, checksum, nseq, protocol, fileName)
+    
+    @staticmethod
+    def unpack_download_response(bytes):
+        print(HEADER_FORMAT + DOWNLOAD_REQUEST_FORMAT)
+        opcode, checksum, nseq, fileSize, md5 = struct.unpack(HEADER_FORMAT + DOWNLOAD_RESPONSE_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+        payload = {
+            'filesize': Utils.bytesToInt(fileSize),
+            'md5': md5
+        }
+
+        return header, payload
+    
+    @staticmethod
+    def unpack_download_request(bytes):
+        opcode, checksum, nseq, protocol, fileName = struct.unpack(HEADER_FORMAT + DOWNLOAD_REQUEST_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+        payload = {
+            'protocol': Utils.bytesToInt(protocol),
+            'fileName': fileName.decode(),
+        }
+
+        return header, payload
+    
+    @staticmethod
+    def pack_download_response(header, payload):
+        opcode = header[0]
+        checksum = header[1]
+        nseq = header[2]
+        filesize = payload[0]
+        md5 = payload[1]
+
+        return struct.pack(HEADER_FORMAT + DOWNLOAD_RESPONSE_FORMAT, opcode, checksum, nseq, md5, filesize)

@@ -44,7 +44,7 @@ def main(argv):
             Logger.SetLogLevel(LOG_LEVEL_DEBUG)
             Logger.LogInfo("Verbosity will now be set to Debug")
         
-         # QUIET
+        # QUIET
         elif opt in ("-q", "--quiet"):
             Logger.LogInfo("Verbosity will now be set to Error")
             Logger.SetLogLevel(LOG_LEVEL_ERROR)           
@@ -54,7 +54,7 @@ def main(argv):
             host_service_ip_address = arg
             Logger.LogInfo(f"Host set to {host_service_ip_address}")
 
-       # PORT
+        # PORT
         elif opt in ("-p", "--port"):
             port_service_port = int(arg)
             Logger.LogInfo(f"Port set to {port_service_port}")
@@ -95,7 +95,6 @@ def main(argv):
             print('Invalid option. \n')
 
     client.download(file_name)
-
     client.close()
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 import hashlib
 import math
 import time
+import os
 from common.Packet import Packet
 from common.Utils import Utils
 from common.constants import *
@@ -34,7 +35,6 @@ class ClientSelectiveRepeat:
         with open(filename, 'rb') as file:
             file = file.read()
             
-
         md5 = hashlib.md5(file)
         filesize = len(file)
         totalPackets = math.ceil(filesize / CHUNKSIZE)
@@ -189,7 +189,6 @@ class ClientSelectiveRepeat:
         
         self.send(message)
 
-
         print('Finalized uploading file')
 
     def sendLastPackage(self, payload, nseq):
@@ -204,4 +203,169 @@ class ClientSelectiveRepeat:
         self.send(message)
 
     def download(self, filename):
-        pass
+        Logger.LogInfo (f"About to start downloading: {filename}")
+        initCommunicationSocketTimeout = 0
+        communicationStarted = False
+           
+        self.sendDownloadRequest(filename)
+        firstPacketSentTime = time.time()
+
+        filesize = None
+        md5 = None
+
+        while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
+            try:
+                self.socket.settimeout(0.2)
+                filesize, md5 = self.receiveDownloadResponse()
+                initCommunicationSocketTimeout = 0
+                communicationStarted = True
+            except TimeoutError:                
+                initCommunicationSocketTimeout += 1
+                Logger.LogWarning(f"There has been a timeout (timeout number: {initCommunicationSocketTimeout})")
+
+            if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                self.sendDownloadRequest(filename)
+                firstPacketSentTime = time.time()
+
+        Logger.LogDebug(f"You are about to download a file of {filesize} bytes and with an md5 of {md5}")
+
+        # POLITICA DE REINTENTOS #
+        self.sendConnectionACK()
+
+        fileNameModified = filename.rstrip('\x00')
+        file = {}
+        totalPackets = math.ceil(filesize / CHUNKSIZE)
+        distinctAcksSent = 0
+        firstIteration = True
+
+        for i in range(1,10):
+            self.window.append({'nseq': i, 'isACKSent': False})
+
+        header = None
+        payload = None
+
+        while distinctAcksSent != totalPackets:
+            if not firstIteration:
+                header, payload = self.receivePackage()
+            else:
+                firstIteration = False
+
+            if header != None and self.isChecksumOK(header, payload):
+                self.sendACK(header['nseq'])
+            
+            for e in self.window:
+                if header != None and (not e['isACKSent']) and header['nseq'] == e['nseq']:
+                    e['isACKSent'] = True
+                    distinctAcksSent += 1
+                    file[header['nseq'] - 1] = payload
+                  
+            if header != None and header['nseq'] == self.window[0]['nseq']:
+                self.moveWindow()
+
+        bytesInLatestPacket = filesize % CHUNKSIZE
+        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
+        file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
+        Logger.LogWarning(f"Padding removed")
+        self.saveFile(file, fileNameModified)
+
+        self.stopFileTransfer(totalPackets+1, fileNameModified, md5)
+
+        print('File transfer has ended.')
+
+    def sendDownloadRequest(self, fileName):
+        opcode = bytes([0x2])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseq = (0).to_bytes(1, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequest')
+        header = (opcode, finalChecksum, nseq)
+    
+        protocol = self.protocolID
+        fileName = fileName.encode()
+        payload  = (protocol, fileName)
+    
+        message = Packet.pack_download_request(header, payload)
+        self.send(message)
+
+    def receiveDownloadResponse(self):
+        received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(DOWNLOAD_RESPONSE_SIZE)
+
+        self.serverAddress = udpServerThreadAddress
+        self.serverPort = udpServerThreadPort
+
+        header, payload = Packet.unpack_download_response(received_message)
+
+        return payload['filesize'], payload['md5']
+    
+    def receivePackage(self):
+        received_message, (serverAddres, serverPort) = self.socket.receive(PACKET_SIZE)
+
+        if Utils.bytesToInt(received_message[:1]) == 0:
+            header, payload = Packet.unpack_upload_request(received_message)
+        else:
+            header, payload = Packet.unpack_package(received_message)
+
+        return header, payload
+    
+    def isChecksumOK(self, header, payload):
+        opcode = header['opcode'].to_bytes(1, BYTEORDER)
+        checksum = (header['checksum']).to_bytes(4, BYTEORDER)
+        nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
+        
+        return Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes))
+    
+    def sendACK(self, nseq):
+        opcode = bytes([0x5])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseqToBytes = nseq.to_bytes(4, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending ACK {nseq} ")
+        self.send(message)
+
+    def sendConnectionACK(self):
+        opcode = bytes([0x3])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseqToBytes = (0).to_bytes(4, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending Connection ACK")
+        self.send(message)
+
+    def saveFile(self, file, fileName):
+        completeName = os.path.join(self.storage, fileName)
+        os.makedirs(os.path.dirname(completeName), exist_ok=True)
+        
+        fileWriter = open(completeName, "wb")
+        for i in range(0, len(file)):
+            fileWriter.write(file[i])
+        
+        Logger.LogInfo(f"File written into: {completeName}")
+        fileWriter.close()
+
+    def stopFileTransfer(self, nseq, fileName, originalMd5):
+        opcode = bytes([0x6])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseqToBytes = nseq.to_bytes(4, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        
+        file:bytes
+        completeName = os.path.join(self.storage, fileName)
+        with open(completeName, 'rb') as file:
+            file = file.read()
+
+        md5 = hashlib.md5(file)
+        Logger.LogDebug(f"File client MD5: \t{md5.hexdigest()}")
+        Logger.LogDebug(f"Server's MD5: \t\t{originalMd5.hex()}")        
+        
+        state = bytes([0x0]) # Not okay by default
+        if md5.hexdigest() == originalMd5.hex():
+            state = bytes([0x1])
+
+        payload = (md5.digest(), state)
+        message = Packet.pack_stop_file_transfer(header, payload)
+    
+        self.send(message)
+        

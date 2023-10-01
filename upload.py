@@ -95,7 +95,6 @@ def main(argv):
             print('Invalid option. \n')
 
     client.upload(file_name)
-
     client.close()
 
 if __name__ == '__main__':
