@@ -73,7 +73,10 @@ class ClientSelectiveRepeat:
             
             for e in self.window:
                 if not e['isSent']:
-                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    if (e['nseq'] != totalPackets):
+                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    else:
+                        self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
                     e['isSent'] = True
             
@@ -89,7 +92,10 @@ class ClientSelectiveRepeat:
                     e['isACKed'] = True
                     packetsACKed += 1  
                 if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    if (e['nseq'] != totalPackets):
+                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                    else:
+                        self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
                     e['sentAt'] = time.time()
             
             if self.window[0]['isACKed']:
@@ -167,6 +173,23 @@ class ClientSelectiveRepeat:
         self.send(message)
 
         print('La carga del archivo ha finalizado, yo ya me cierro. ¡Adios!')
+
+    def sendLastPackage(self, payload, nseq):
+        opcode = bytes([0x4])
+
+        checksum = (2).to_bytes(4, BYTEORDER)
+           
+        nseqToBytes = nseq.to_bytes(4, BYTEORDER)
+        header = (opcode, checksum, nseqToBytes)
+
+        print('$$$$$$$$$$$$$$$$$$$')
+        print(len(payload))
+        print(payload)
+        print('$$$$$$$$$$$$$$$$$$$')
+
+        message = Packet.pack_package(header, payload)
+        print('Enviaré un paquete con nseq: ', nseq)
+        self.send(message)
 
     def download(self, filename):
         pass

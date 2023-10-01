@@ -59,12 +59,16 @@ class Packet:
         return header, payload
         
     @staticmethod
-    def pack_package(header, payload):
+    def pack_package(header, payload, lastPackage = False):
         opcode = header[0]
         checksum = header[1]
         nseq = header[2]
         
-        return struct.pack(HEADER_FORMAT + PACKAGE_FORMAT, opcode, checksum, nseq, payload)
+        if lastPackage:
+            lastPacketLength = len(payload)
+            return struct.pack(lastPacketLength, opcode, checksum, nseq, payload)
+        else:
+            return struct.pack(HEADER_FORMAT + PACKAGE_FORMAT, opcode, checksum, nseq, payload)
 
     @staticmethod
     def unpack_ack(bytes):
