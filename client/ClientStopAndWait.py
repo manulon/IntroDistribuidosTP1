@@ -106,6 +106,25 @@ class ClientStopAndWait:
 
 
     def download(self, filename):
-        pass
+        '''
+            Enviar download request con filename
+            Esperar respuesta del servidor
+            tomar tamano del archivo y chunksize
+            #seria mucho lujo verificar que haya espacio en disco para la descarga?
+            paquetesTotales = tam/chunksize
+            md5 = md5 del server
+            enviar OK al servidor
+            Mientras ACKs enviados < PaquetesTotales
+                esperar a recibir paquete
+                if cheksum y nseq OK
+                    Mandar Ack del paquete
+                    appendear bytes del payload
+                    acks enviados ++
+                else 
+                    solo mandar ack pues el servidor hizo una retransmision por perdida
+            verificar mda5
+            if mda5 bien
+                ENVIAR ok final y retornar
+        '''
 
 
