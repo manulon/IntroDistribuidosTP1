@@ -9,7 +9,7 @@ def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
     host_service_ip_address = 'localhost'
     port_service_port = 16000
-    storage = ""
+    storage = "./server_files/"
 
     try:
         opts, args = getopt.getopt(argv, "hvqH:p:s:", ["help", "verbose", "quiet", "host=", "port=", "storage="])
@@ -58,13 +58,10 @@ def main(argv):
             storage = arg
             if storage[-1] != '/':
                 storage += '/'
-            if not os.path.isdir(storage):
-                Logger.LogError(f"Invalid storage path {storage}")
-                return
             Logger.LogInfo(f"Storage {storage}")
 
 
-    server = Server(host_service_ip_address, port_service_port)
+    server = Server(host_service_ip_address, port_service_port, storage)
     server.receive()
 
 if __name__ == '__main__':
