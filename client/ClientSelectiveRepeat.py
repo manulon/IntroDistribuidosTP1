@@ -1,3 +1,4 @@
+import hashlib
 import math
 import time
 from common.Packet import Packet
@@ -28,8 +29,19 @@ class ClientSelectiveRepeat:
         Logger.LogInfo (f"About to start uploading: {filename}")
         initCommunicationSocketTimeout = 0
         communicationStarted = False
+        
+        file:bytes        
+        with open(filename, 'rb') as file:
+            file = file.read()
+            
 
-        self.sendUploadRequest(filename)
+        md5 = hashlib.md5(file)
+        filesize = len(file)
+        totalPackets = math.ceil(filesize / CHUNKSIZE)
+        
+        Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
+        
+        self.sendUploadRequest(filename, filesize, md5.digest())
         firstPacketSentTime = time.time()
 
         while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
@@ -43,24 +55,10 @@ class ClientSelectiveRepeat:
                 Logger.LogWarning(f"There has been a timeout (timeout number: {initCommunicationSocketTimeout})")
 
             if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                self.sendUploadRequest(filename)
+                self.sendUploadRequest(filename, filesize, md5.digest())
                 firstPacketSentTime = time.time()
 
-
-        #######################################
-        #        FAKE STRING BYTES            #
-        #######################################
-        archivo = b''
-        cantidadPaquetes = 31
-        for i in range(cantidadPaquetes):
-            archivo += Utils.bytesNumerados(self.chunksize, i)
-        #######################################
-        #        FAKE STRING BYTES            #
-        #######################################
-
-        # VER COMO LO CONSEGUIMOS XD
-        filesize = 4096*31
-        totalPackets = math.ceil(filesize / CHUNKSIZE)
+        Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
         packetsACKed = 0
         packetsPushed = 0
         nseq = 1
@@ -69,7 +67,7 @@ class ClientSelectiveRepeat:
 
         while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
             while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
-                payloadAux = archivo[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
+                payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
                 payloadWithNseq[nseq] = payloadAux
                 self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
                 packetsPushed += 1
@@ -111,7 +109,7 @@ class ClientSelectiveRepeat:
         print('File transfer has ended.')
         Logger.LogInfo(f"Total packets to send: {totalPackets}, nseq: {nseq}, socket timeouts: {socketTimeouts}")
 
-    def sendUploadRequest(self, fileName):
+    def sendUploadRequest(self, fileName, fileSize, md5):
         opcode = bytes([0x0])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
@@ -120,9 +118,7 @@ class ClientSelectiveRepeat:
 
         protocol = self.protocolID
         fileName = fileName.encode()
-        fileSize = (4096*31).to_bytes(16, BYTEORDER)       # 16 bytes 
-        md5      = Utils.bytes(16)                         # 16 bytes vacíos
-        payload  = (protocol, fileName, fileSize, md5)
+        payload  = (protocol, fileName,(fileSize).to_bytes(16, BYTEORDER), md5)
 
         message = Packet.pack_upload_request(header, payload)
         self.send(message)
@@ -172,7 +168,8 @@ class ClientSelectiveRepeat:
         header, payload = Packet.unpack_stop_file_transfer(received_message)
         Logger.LogInfo(f"Received ACK: {header['nseq']}")
 
-        # Aca va la verificacion del md5 del archivo y el state
+        if payload["state"] == 0:
+            Logger.LogError("There's been an error uploading the file in the server. File corrupt in the server")
 
         opcode = bytes([0x7])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)

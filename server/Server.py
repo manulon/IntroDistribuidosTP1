@@ -7,11 +7,12 @@ from common.Checksum import *
 from server.ServerSelectiveRepeat import *
 
 class Server():
-    def __init__(self, address, port):
+    def __init__(self, address, port, storage):
         self.port = port
         self.address = address
         self.socket = Socket(self.port, self.address)
         self.protocol = None
+        self.storage = storage
 
     def receive(self):
         print('The server is ready to receive')
@@ -24,9 +25,9 @@ class Server():
                 case 0: # Upload
                     if payload['protocol'] == 1:
                         print('Seleccionaste Selective Repeat')
-                        protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort)
+                        protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort, self.storage)
                         self.protocol = protocol
-                        self.protocol.upload(payload['fileSize'])
+                        self.protocol.upload(payload['fileSize'],payload['fileName'], payload['md5'])
                     else:
                         print('Seleccionaste Stop and Wait')
                     break
