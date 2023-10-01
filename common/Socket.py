@@ -16,3 +16,6 @@ class Socket:
 
     def close(self):
         self.socket.close()
+
+    def settimeout(self, time):
+        self.socket.settimeout(time)

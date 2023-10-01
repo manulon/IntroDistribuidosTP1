@@ -5,6 +5,9 @@ from common.constants import *
 from common.Utils import *
 from server.ServerSelectiveRepeat import ServerSelectiveRepeat
 from server.ServerStopAndWait import ServerStopAndWait
+from common.Logger import *
+from common.Checksum import *
+from server.ServerSelectiveRepeat import *
 
 class Server():
     MAX_FILE_SIZE = 4000000000 # 4GB
@@ -21,11 +24,12 @@ class Server():
     def receive(self):
         print('The server is ready to receive')
         while True:
-            received_message, (clientAddress, clientPort) = self.socket.receive(FILE_TRANSFER_REQUEST_SIZE)
-            opcode = int.from_bytes(received_message[:1], BYTEORDER)
-            match opcode:
+            firstPacketIsValid = False
+            while not firstPacketIsValid:
+                firstPacketIsValid, header, payload, clientAddress, clientPort = self.receiveFirstPacket()
+            
+            match header['opcode']:
                 case 0: # Upload
-                    header, payload = Packet.unpack_upload_request(received_message)
                     if payload['fileSize'] > self.MAX_FILE_SIZE:
                         self.sendFileTooBigError()
                         break
@@ -39,7 +43,6 @@ class Server():
                         print('Selected Selective Repeat')
                         protocol = ServerSelectiveRepeat(self.socket, clientAddress, clientPort)
                         self.protocol = protocol
-                        self.protocol.sendFileTransferTypeResponse()
                         self.protocol.upload(payload['fileSize'])
                     else:
                         print('Selected Stop and Wait')
@@ -56,7 +59,7 @@ class Server():
                     #StopAndWait.list(message)
                     break
                 case default:
-                    # print("message not understood")
+                    Logger.LogError(f"The value {header['opcode']} is not a valid opcode")
                     # close connection
                     break
             #modifiedMessage = message.decode().upper()
@@ -97,6 +100,21 @@ class Server():
         message = Packet.pack_file_does_not_exist_error(header)
         self.send(message)
     '''
+    def receiveFirstPacket(self):
+        received_message, (clientAddress, clientPort) = self.socket.receive(FILE_TRANSFER_REQUEST_SIZE)
+        header, payload = Packet.unpack_upload_request(received_message)
+
+        firstPacketIsValid = self.isChecksumOK(header, payload)
+
+        return firstPacketIsValid, header, payload, clientAddress, clientPort
+
+    def isChecksumOK(self, header, payload):
+        Logger.LogDebug(f"{header}")
+        opcode = header['opcode'].to_bytes(1, BYTEORDER)
+        checksum = (header['checksum']).to_bytes(4, BYTEORDER)
+        nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
+        
+        return Checksum.is_checksum_valid(checksum + opcode  + nseqToBytes, len(opcode + checksum + nseqToBytes))
 
     def close(self):
         self.socket.close()
