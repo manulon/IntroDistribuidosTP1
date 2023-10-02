@@ -118,6 +118,10 @@ class Packet:
         return Packet.pack_header(header)
     
     @staticmethod
+    def pack_file_does_not_exist_error(header):
+        return Packet.pack_header(header)
+    
+    @staticmethod
     def pack_stop_file_transfer(header, payload):
         opcode = header[0]
         checksum = header[1]
