@@ -216,7 +216,7 @@ class ClientStopAndWait:
             Logger.LogError(f"Not enough space for download {fileSize/1000}kB are needed")
             return
         file = []
-        totalPackets = fileSize / const.CHUNKSIZE
+        totalPackets = math.ceil(fileSize / const.CHUNKSIZE)
         acksSent = 0
         # enviar ok al servidor para que arranque la descarga
         while acksSent < totalPackets:
