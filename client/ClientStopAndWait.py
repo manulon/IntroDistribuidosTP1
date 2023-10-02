@@ -20,6 +20,9 @@ class ClientStopAndWait:
         self.serverPort = serverPort
         self.socket = socket
 
+    def setStorage(self, storage):
+        self.storage = storage
+
     def upload(self, filename):
         Logger.LogInfo(f"About to start uploading: {filename}")
 
@@ -245,20 +248,20 @@ class ClientStopAndWait:
         self.stopFileTransfer(nextNseq, fileName, newMd5, state)
 
     def sendDownloadRequest(self, fileName):
-            opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
-            zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
-            nseq = (0).to_bytes(1, const.BYTEORDER)
-            finalChecksum = Checksum.get_checksum(
-                zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequest')
-            header = (opcode, finalChecksum, nseq)
+        opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseq = (0).to_bytes(1, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(
+            zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequest')
+        header = (opcode, finalChecksum, nseq)
 
-            protocol = self.protocolID
-            fileName = fileName.encode()
-            payload = (
-                protocol,
-                fileName)
-            message = Packet.pack_package(header, payload)
-            self.send(message)
+        protocol = self.protocolID
+        fileName = fileName.encode()
+        payload = (
+            protocol,
+            fileName)
+        message = Packet.pack_download_request(header, payload)
+        self.send(message)
 
     def receiveDownloadResponse(self):
         received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(const.DOWNLOAD_RESPONSE_SIZE)
