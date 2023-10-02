@@ -321,7 +321,7 @@ class ClientSelectiveRepeat:
 
         return header, payload
     
-    def receivePackage(self):
+    def receivePacket(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(PACKET_SIZE)
 
         if Utils.bytesToInt(received_message[:1]) == 0:
@@ -345,7 +345,7 @@ class ClientSelectiveRepeat:
         return Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes))
     
     def sendACK(self, nseq):
-        opcode = bytes([0x5])
+        opcode = bytes([ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
@@ -355,7 +355,7 @@ class ClientSelectiveRepeat:
         self.send(message)
 
     def sendConnectionACK(self):
-        opcode = bytes([0x3])
+        opcode = bytes([INIT_DOWNLOAD_ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (0).to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
@@ -376,7 +376,7 @@ class ClientSelectiveRepeat:
         fileWriter.close()
 
     def stopFileTransfer(self, nseq, fileName, originalMd5):
-        opcode = bytes([0x6])
+        opcode = bytes([STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
@@ -391,9 +391,9 @@ class ClientSelectiveRepeat:
         Logger.LogDebug(f"File client MD5: \t{md5.hexdigest()}")
         Logger.LogDebug(f"Server's MD5: \t\t{originalMd5.hex()}")        
         
-        state = bytes([0x0]) # Not okay by default
+        state = bytes([STATE_ERROR]) # Not okay by default
         if md5.hexdigest() == originalMd5.hex():
-            state = bytes([0x1])
+            state = bytes([STATE_OK])
 
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)

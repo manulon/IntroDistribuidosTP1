@@ -1,11 +1,12 @@
 import hashlib
 import math
+import os
 import time
 from common.Checksum import Checksum
 from common.Logger import Logger
 from common.Packet import Packet
 import common.constants as const
-import common.Utils as u
+from common.Utils import Utils
 
 
 class ClientStopAndWait:
@@ -213,17 +214,26 @@ class ClientStopAndWait:
     def download(self, fileName):
         Logger.LogInfo (f"About to start downloading: {fileName}")
         self.sendDownloadRequest(fileName)
-        fileSize, md5 = self.receiveDownloadResponse()
+        opcode, fileSize, md5 = self.receiveDownloadResponse()
 
-        if fileSize >= u.getFreeDiskSpace():
+        if fileSize >= Utils.getFreeDiskSpace():
             Logger.LogError(f"Not enough space for download {fileSize/1000}kB are needed")
             return
+        if opcode == const.FILE_DOES_NOT_EXIST_OPCODE:
+            Logger.LogError(f"File {fileName} does not exist in the server")
+            return
+        if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
+            Logger.LogError(f"Unknown error")
+            return
+
+        self.sendConnectionACK()
         file = []
         totalPackets = math.ceil(fileSize / const.CHUNKSIZE)
         acksSent = 0
+        nextNseq = 1
         # enviar ok al servidor para que arranque la descarga
         while acksSent < totalPackets:
-            header, payload = self.receivePackage()
+            header, payload = self.receivePacket()
             if header['nseq'] == nextNseq:
                 # package = Packet.pack_package(header, payload)
                 # if self.isChecksumOK(header, payload):
@@ -264,15 +274,43 @@ class ClientStopAndWait:
         self.send(message)
 
     def receiveDownloadResponse(self):
-        received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(const.DOWNLOAD_RESPONSE_SIZE)
-        self.serverAddress = udpServerThreadAddress
-        self.serverPort = udpServerThreadPort
-        _, payload = Packet.unpack_download_response(received_message)
-        return payload['filesize'], payload['md5']
-    
+        socketTimeouts = 0
+        receivedResponse = False
+        while socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS and not receivedResponse:
+            try:
+                self.socket.settimeout(0.2)
+                received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(const.DOWNLOAD_RESPONSE_SIZE)
+                receivedResponse = True
+                self.serverAddress = udpServerThreadAddress
+                self.serverPort = udpServerThreadPort
+            except TimeoutError:
+                socketTimeouts += 1
+                Logger.LogError("There has been a timeout")
+            except:
+                Logger.LogError("There has been an error receiving the download response")
+                return const.ERROR_CODE, 0, 0
 
+        if Utils.bytesToInt(received_message[:1]) == const.FILE_DOES_NOT_EXIST_OPCODE:
+            return const.FILE_DOES_NOT_EXIST_OPCODE, 0, 0
+        elif Utils.bytesToInt(received_message[:1]) == const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
+            Logger.LogDebug("Received download response")
+            _, payload = Packet.unpack_download_response(received_message)
+            return Utils.bytesToInt(received_message[:1]), payload['filesize'], payload['md5']
+        else:
+            return const.ERROR_CODE, 0, 0
+    
+    def receivePacket(self):
+        received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
+
+        if Utils.bytesToInt(received_message[:1]) == 0:
+            header, payload = Packet.unpack_upload_request(received_message)
+        else:
+            header, payload = Packet.unpack_package(received_message)
+
+        return header, payload
+    
     def sendConnectionACK(self):
-        opcode = bytes([0x3])
+        opcode = bytes([const.INIT_DOWNLOAD_ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseqToBytes = (0).to_bytes(4, const.BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
@@ -280,3 +318,53 @@ class ClientStopAndWait:
         message = Packet.pack_ack(header)
         Logger.LogInfo(f"Sending Connection ACK")
         self.send(message)
+
+    def sendACK(self, nseq):
+        opcode = bytes([const.ACK_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending ACK {nseq} ")
+        self.send(message)
+
+    def checkFileMD5(self, fileName, originalMd5):
+        file: bytes
+        completeName = os.path.join(self.storage, fileName)
+        with open(completeName, 'rb') as file:
+            file = file.read()
+
+        md5 = hashlib.md5(file)
+        Logger.LogDebug(f"File server MD5: \t{md5.hexdigest()}")
+        Logger.LogDebug(f"Client's MD5: \t\t{originalMd5.hex()}")
+
+        state = bytes([const.STATE_ERROR])  # Not okay by default
+        if md5.hexdigest() == originalMd5.hex():
+            state = bytes([const.STATE_OK])
+
+        return md5, state
+
+    def saveFile(self, file, fileName):
+        completeName = os.path.join(self.storage, fileName)
+        os.makedirs(os.path.dirname(completeName), exist_ok=True)
+        
+        fileWriter = open(completeName, "wb")
+        for i in range(0, len(file)):
+            fileWriter.write(file[i])
+        
+        Logger.LogInfo(f"File written into: {completeName}")
+        fileWriter.close()
+
+    def stopFileTransfer(self, nseq, fileName, md5, state):
+        opcode = bytes([const.STOP_FILE_TRANSFER_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        
+        header = (opcode, finalChecksum, nseqToBytes)
+        payload = (md5.digest(), state)
+        message = Packet.pack_stop_file_transfer(header, payload)
+    
+        self.send(message)
+        

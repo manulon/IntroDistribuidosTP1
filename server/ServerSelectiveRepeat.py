@@ -184,7 +184,7 @@ class ServerSelectiveRepeat:
                         
 
     def sendDownloadRequestResponse(self, file):
-        opcode = bytes([0x11])
+        opcode = bytes([DOWNLOAD_REQUEST_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequestResponse')
@@ -198,7 +198,7 @@ class ServerSelectiveRepeat:
 
         message = Packet.pack_download_response(header, payload)
 
-        Logger.LogDebug(f"Im sending a packet with opcode: {opcode} and nseq: {nseq}")
+        Logger.LogDebug(f"Im sending a packet with opcode: {Utils.bytesToInt(opcode)} and nseq: {Utils.bytesToInt(nseq)}")
         self.send(message)
 
         nextPacketIsAnOk = False
@@ -207,7 +207,7 @@ class ServerSelectiveRepeat:
         receivedOpcode = self.receiveResponseACK()
 
         while not nextPacketIsAnOk:
-            if receivedOpcode == 2:
+            if receivedOpcode == DOWNLOAD_REQUEST_OPCODE: # Client re-sent request
                 self.send(message)
                 receivedOpcode = self.receiveResponseACK()
             else:
