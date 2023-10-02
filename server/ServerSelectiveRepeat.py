@@ -50,6 +50,7 @@ class ServerSelectiveRepeat:
         return receivedPacketHeader, receivedPacketPayload
             
     def upload(self, filesize, fileName, originalMd5):
+        self.window = []
         fileName = fileName.rstrip('\x00')
         header, payload = self.sendFileTransferTypeResponse()
         file = {}
@@ -76,7 +77,7 @@ class ServerSelectiveRepeat:
                     file[header['nseq'] - 1] = payload
                               
             if header['nseq'] == self.window[0]['nseq']:
-                self.moveWindow()
+                self.moveReceiveWindow()
 
         bytesInLatestPacket = filesize % CHUNKSIZE
         Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
@@ -86,7 +87,8 @@ class ServerSelectiveRepeat:
 
         self.stopFileTransfer(totalPackets+1, fileName, originalMd5)
 
-    def download(self, filename):       
+    def download(self, filename): 
+        self.window = []      
         filename = filename.rstrip('\x00')
         file:bytes
         completeName = os.path.join(self.storage, filename)
@@ -149,7 +151,7 @@ class ServerSelectiveRepeat:
             
             if self.window[0]['isACKed']:
                 Logger.LogDebug("Moving window")
-                self.moveWindow()
+                self.moveSendWindow()
 
         self.stopDownloading()
 
@@ -220,7 +222,7 @@ class ServerSelectiveRepeat:
         Logger.LogInfo(f"Sending ACK {nseq} ")
         self.send(message)
 
-    def moveWindow(self):
+    def moveReceiveWindow(self):
         while len(self.window) != 0 and self.window[0]['isACKSent']:
             lastNseq = self.window[-1]['nseq']
             self.window.pop(0)
@@ -328,6 +330,10 @@ class ServerSelectiveRepeat:
         message = Packet.pack_package(header, payload)
         Logger.LogInfo(f"About to send packet nseq: {nseq}")
         self.send(message)
+
+    def moveSendWindow(self):
+        while len(self.window) != 0 and self.window[0]['isACKed']:
+            self.window.pop(0)
 
     def receiveACK(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(ACK_SIZE)

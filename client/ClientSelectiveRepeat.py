@@ -17,17 +17,22 @@ class ClientSelectiveRepeat:
         self.protocolID = bytes([0x1])
         self.window = []
         self.chunksize = None
+        self.storage = None
   
     def setServerInfo(self, serverAddress, serverPort, socket):
         self.serverAddress = serverAddress
         self.serverPort = serverPort
         self.socket = socket
 
+    def setStorage(self, storage):
+        self.storage = storage
+    
     def send(self, message):
         self.socket.send(message, self.serverAddress, self.serverPort)
         
     def upload(self, filename):
         Logger.LogInfo (f"About to start uploading: {filename}")
+        self.window = []
         initCommunicationSocketTimeout = 0
         communicationStarted = False
         
@@ -106,7 +111,7 @@ class ClientSelectiveRepeat:
             
             if self.window[0]['isACKed']:
                 Logger.LogDebug("Moving window")
-                self.moveWindow()
+                self.moveSendWindow()
 
 
         self.stopUploading(int(totalPackets + 1))
@@ -165,7 +170,7 @@ class ClientSelectiveRepeat:
             Logger.LogWarning("Invalid checksum for ACK receeived")
             return header['nseq']
 
-    def moveWindow(self):
+    def moveSendWindow(self):
         while len(self.window) != 0 and self.window[0]['isACKed']:
             self.window.pop(0)
 
@@ -204,6 +209,7 @@ class ClientSelectiveRepeat:
 
     def download(self, filename):
         Logger.LogInfo (f"About to start downloading: {filename}")
+        self.window = []
         initCommunicationSocketTimeout = 0
         communicationStarted = False
            
@@ -260,7 +266,7 @@ class ClientSelectiveRepeat:
                     file[header['nseq'] - 1] = payload
                   
             if header != None and header['nseq'] == self.window[0]['nseq']:
-                self.moveWindow()
+                self.moveReceiveWindow()
 
         bytesInLatestPacket = filesize % CHUNKSIZE
         Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
@@ -306,6 +312,12 @@ class ClientSelectiveRepeat:
 
         return header, payload
     
+    def moveReceiveWindow(self):
+        while len(self.window) != 0 and self.window[0]['isACKSent']:
+            lastNseq = self.window[-1]['nseq']
+            self.window.pop(0)
+            self.window.append({'nseq': lastNseq + 1, 'isACKSent': False})
+
     def isChecksumOK(self, header, payload):
         opcode = header['opcode'].to_bytes(1, BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, BYTEORDER)

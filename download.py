@@ -11,7 +11,7 @@ def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
     host_service_ip_address = "localhost"  # por defecto localhost
     port_service_port = 15000  # por defecto 15000
-    storage = ""
+    storage = "./client_files"
     file_name = None
     
     try:
@@ -79,7 +79,7 @@ def main(argv):
         Logger.LogError("No file specified")
         return
 
-    client = Client(host_service_ip_address, port_service_port)
+    client = Client(host_service_ip_address, port_service_port, storage)
 
     has_protocol = False
     while (has_protocol == False):
