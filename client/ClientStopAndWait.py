@@ -244,7 +244,6 @@ class ClientStopAndWait:
         newMd5, state = self.checkFileMD5(fileName, md5)
         self.stopFileTransfer(nextNseq, fileName, newMd5, state)
 
-    print('File transfer has ended.')
     def sendDownloadRequest(self, fileName):
             opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
             zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)

@@ -80,7 +80,7 @@ class ClientSelectiveRepeat:
                     self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
                     packetsPushed += 1
                     nseq += 1
-                
+
                 for e in self.window:
                     if not e['isSent']:
                         Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
@@ -100,27 +100,27 @@ class ClientSelectiveRepeat:
                 except:
                     Logger.LogError("There has been an error receiving the ACK")
 
-            for e in self.window:
-                if (not e['isACKed']) and ackReceived == e['nseq']:
-                    e['isACKed'] = True
-                    packetsACKed += 1
-                    Logger.LogDebug(f"ACKed {packetsACKed} packets")  
-                if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                    if (e['nseq'] != totalPackets):
-                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                    else:
-                        self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                    e['sentAt'] = time.time()
-            
-            if self.window[0]['isACKed']:
-                Logger.LogDebug("Moving window")
-                self.moveSendWindow()
+                for e in self.window:
+
+                    if (not e['isACKed']) and ackReceived == e['nseq']:
+                        e['isACKed'] = True
+                        packetsACKed += 1
+                        Logger.LogDebug(f"ACKed {packetsACKed} packets")  
+                    if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                        if (e['nseq'] != totalPackets):
+                            self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                        else:
+                            self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                        e['sentAt'] = time.time()
+
+                if self.window[0]['isACKed']:
+                    Logger.LogDebug("Moving window")
+                    self.moveSendWindow()
 
         print("Verifying file...")
         self.stopUploading(int(totalPackets + 1))
 
         print('File transfer has completed.')
-        Logger.LogInfo(f"Total packets to send: {totalPackets}, nseq: {nseq}, socket timeouts: {socketTimeouts}")
 
     def sendUploadRequest(self, fileName, fileSize, md5):
         opcode = bytes([UPLOAD_REQUEST_OPCODE])

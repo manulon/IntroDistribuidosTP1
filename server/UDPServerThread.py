@@ -31,6 +31,7 @@ class UDPServerThread(threading.Thread):
                     Logger.LogError(f"The value {self.firstPacketHeader['opcode']} is not a valid opcode")
                     
             #modifiedMessage = message.decode().upper()
+        Logger.LogDebug(f"The main loop of the UDP Server Thread finished")
 
     def force_stop(self):
         self.allowedToRun = False

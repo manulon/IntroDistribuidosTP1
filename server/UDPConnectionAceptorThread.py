@@ -46,7 +46,7 @@ class UDPConnectionAceptorThread(threading.Thread):
                                 Logger.LogInfo('Selected Selective Repeat')
 
                         self.clients[(clientAddress, clientPort)] = UDPServerThread(protocol, header, payload)
-                        self.clients[(clientAddress, clientPort)].run()
+                        self.clients[(clientAddress, clientPort)].start()
                 except:
                     continue
 
@@ -63,7 +63,6 @@ class UDPConnectionAceptorThread(threading.Thread):
         elif Utils.bytesToInt(received_message[:1]) == 2:
             header, payload = Packet.unpack_download_request(received_message)
         
-        # Tengo quilombos con el checksum!! Ver como se arregla
         firstPacketIsValid = self.isChecksumOK(header, payload)
 
         Logger.LogDebug(f"Is the first packet valid? The answer is {firstPacketIsValid}")
@@ -85,3 +84,4 @@ class UDPConnectionAceptorThread(threading.Thread):
             self.clients[k].force_stop()
         for k in self.clients.keys():
             self.clients[k].join()
+            Logger.LogDebug(f"The connection with {k[0]}:{k[1]} is finished.")
