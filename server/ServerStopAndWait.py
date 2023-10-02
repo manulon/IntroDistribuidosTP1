@@ -2,7 +2,7 @@ from common.Packet import Packet
 import os
 from common.Hasher import Hasher
 
-class StopAndWait:
+class ServerStopAndWait:
     def __init__(self, client):
         self.client = client
 
