@@ -3,9 +3,11 @@ import getopt
 import os
 from client.Client import Client
 from client.ClientSelectiveRepeat import ClientSelectiveRepeat
-from common.constants import *
-from client.ClientStopAndWait import *
+from common.constants import \
+    LOG_LEVEL_WARNING, LOG_LEVEL_DEBUG, LOG_LEVEL_ERROR
+from client.ClientStopAndWait import ClientStopAndWait
 from common.Logger import Logger
+
 
 def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
@@ -13,18 +15,24 @@ def main(argv):
     port_service_port = 15000  # por defecto 15000
     storage = "./client_files"
     file_name = None
-    
+
     try:
-        opts, args = getopt.getopt(argv, "hvqH:p:d:n:", ["help", "verbose", "quiet", "host=", "port=", "dst=", "name="])
+        opts, args = getopt.getopt(
+            argv, "hvqH:p:d:n:", [
+                "help", "verbose", "quiet", "host=", "port=", "dst=", "name="])
     except getopt.GetoptError:
         sys.exit(2)
 
     for opt, arg in opts:
         # HELP
-        if opt in ("-h", "--help"): 
-            print("usage: download [-h] [-v | -q] [-H ADDR] [-p PORT] [-s FILEPATH] [-n FILENAME]")
+        if opt in ("-h", "--help"):
+            print(
+                "usage: download [-h] [-v | -q] \
+                    [-H ADDR] [-p PORT] [-s FILEPATH] [-n FILENAME]")
             print()
-            print("Downloads a file up to 4 gb from a server, using UDP over an RDT connection")
+            print(
+                "Downloads a file up to 4 gb from a server,\
+                      using UDP over an RDT connection")
             print("It supports:")
             print("\tSelective Repeat")
             print("\tStop and wait")
@@ -38,16 +46,16 @@ def main(argv):
             print("  -d, --dst      destination file path")
             print("  -n, --name     file name")
             return
-        
+
         # VERBOSE
         elif opt in ("-v", "--verbose"):
             Logger.SetLogLevel(LOG_LEVEL_DEBUG)
             Logger.LogInfo("Verbosity will now be set to Debug")
-        
+
         # QUIET
         elif opt in ("-q", "--quiet"):
             Logger.LogInfo("Verbosity will now be set to Error")
-            Logger.SetLogLevel(LOG_LEVEL_ERROR)           
+            Logger.SetLogLevel(LOG_LEVEL_ERROR)
 
         # HOST
         elif opt in ("-H", "--host"):
@@ -68,22 +76,24 @@ def main(argv):
                 Logger.LogError(f"Invalid path {storage}")
                 return
             Logger.LogInfo(f"Source {storage}")
-            
+
         # NAME
         elif opt in ("-n", "--name"):
             file_name = arg
             if file_name:
                 Logger.LogInfo(f"File name {file_name}")
 
-    if file_name == None or file_name == "" or not file_name:
+    if file_name is None or file_name == "" or not file_name:
         Logger.LogError("No file specified")
         return
 
     client = Client(host_service_ip_address, port_service_port, storage)
 
     has_protocol = False
-    while (has_protocol == False):
-        protocol = input('What protocol do you want to use?: \n 1) Selective Repeat \n 2) Stop and Wait \n')
+    while not has_protocol:
+        protocol = input(
+            'What protocol do you want to use?: \n \
+                1) Selective Repeat \n 2) Stop and Wait \n')
         if (protocol == '1'):
             client.setProtocol(ClientSelectiveRepeat())
             has_protocol = True
@@ -96,6 +106,7 @@ def main(argv):
 
     client.download(file_name)
     client.close()
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])
