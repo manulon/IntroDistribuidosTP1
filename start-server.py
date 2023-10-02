@@ -5,6 +5,7 @@ from common.constants import *
 from server.Server import Server
 from common.Logger import Logger
 
+
 def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
     host_service_ip_address = 'localhost'
