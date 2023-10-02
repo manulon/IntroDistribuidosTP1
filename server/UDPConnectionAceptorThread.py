@@ -3,7 +3,7 @@ from common.constants import *
 from common.Socket import *
 from server.UDPServerThread import *
 from server.ServerSelectiveRepeat import *
-from server.ServerStopAndWait import StopAndWait
+from server.ServerStopAndWait import ServerStopAndWait
 
 
 class UDPConnectionAceptorThread(threading.Thread):
@@ -37,7 +37,7 @@ class UDPConnectionAceptorThread(threading.Thread):
                         
                         match payload['protocol']:
                             case 0: # STOP & WAIT
-                                protocol = StopAndWait(newSocket, clientAddress, clientPort, self.storage)    
+                                protocol = ServerStopAndWait(newSocket, clientAddress, clientPort, self.storage)    
                                 print('Seleccionaste stop and wait')
 
                             case 1: # SELECTIVE REPEAT
