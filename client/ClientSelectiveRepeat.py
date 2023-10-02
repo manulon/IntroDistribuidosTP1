@@ -265,8 +265,29 @@ class ClientSelectiveRepeat:
 
             Logger.LogDebug(f"You are about to download a file of {filesize} bytes and with an md5 of {md5}")
 
-            # POLITICA DE REINTENTOS #
             self.sendConnectionACK()
+            sendConnectionACKSocketTimeout = 0
+            firstPacketArrived = False
+            packetSentTime = time.time()
+
+            self.sendDownloadRequest(filename)
+            
+            header = None
+            payload = None
+
+            while (not firstPacketArrived) and (sendConnectionACKSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
+                try:
+                    self.socket.settimeout(0.2)
+                    header, header = self.receivePacket()
+                    sendConnectionACKSocketTimeout = 0
+                    firstPacketArrived = True
+                except TimeoutError:                
+                    sendConnectionACKSocketTimeout += 1
+                    Logger.LogWarning(f"There has been a timeout (timeout number: {sendConnectionACKSocketTimeout})")
+
+                if (not firstPacketArrived) and (time.time() - packetSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    self.sendConnectionACK(filename)
+                    packetSentTime = time.time()
 
             fileNameModified = filename.rstrip('\x00')
             file = {}
@@ -276,9 +297,6 @@ class ClientSelectiveRepeat:
 
             for i in range(1,10):
                 self.window.append({'nseq': i, 'isACKSent': False})
-
-            header = None
-            payload = None
 
             while distinctAcksSent != totalPackets:
                 if not firstIteration:
