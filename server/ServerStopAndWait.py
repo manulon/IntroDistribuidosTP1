@@ -65,7 +65,6 @@ class ServerStopAndWait:
         self.saveFile(file, fileName)
         md5, state = self.checkFileMD5(fileName, originalMd5)
         self.stopFileTransfer(nextNseq, fileName, md5, state)
-        # self.showFileAsBytes(file)
 
     def download(self, filename):
 
@@ -275,7 +274,7 @@ class ServerStopAndWait:
                stopCommunicationSocketTimeout = 0
                communicationFinished = True
            except TimeoutError:
-               # Acá se da por sentado que el cliente se cerró
+               # We assume the client closed the connection
                stopCommunicationSocketTimeout += 1
 
         header, payload = Packet.unpack_stop_file_transfer(received_message)
@@ -309,14 +308,6 @@ class ServerStopAndWait:
             state = bytes([const.STATE_OK])
 
         return md5, state
-
-    def showFileAsBytes(self, fileArray):
-        content = b''
-        for e in fileArray:
-            content += e
-        print('######################')
-        print('El archivo se ha descargado! Su contenido es el siguiente:')
-        print(content)
 
     def closeSocket(self):
         self.socket.close()
