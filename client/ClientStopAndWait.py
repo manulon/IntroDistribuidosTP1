@@ -58,10 +58,14 @@ class ClientStopAndWait:
 
         message = Packet.pack_upload_request(header, payload)
         self.send(message)
-
+        
     def receiveFileTransferTypeResponse(self):
-        received_message, _ = self.socket.receive(
-            const.FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+        
+        received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(const.FILE_TRANSFER_TYPE_RESPONSE_SIZE)
+
+        self.serverAddress = udpServerThreadAddress
+        self.serverPort = udpServerThreadPort
+
         opcode = int.from_bytes(received_message[:1], const.BYTEORDER)
 
         if opcode == const.FILE_TRANSFER_RESPONSE_OPCODE:
