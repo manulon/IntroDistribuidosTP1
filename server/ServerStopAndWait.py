@@ -1,4 +1,5 @@
 import hashlib
+import math
 import os
 import time
 from common.Logger import Logger
@@ -67,7 +68,107 @@ class ServerStopAndWait:
         # self.showFileAsBytes(file)
 
     def download(self, filename):
-        pass
+
+        filename = filename.rstrip('\x00')
+        file:bytes
+        completeName = os.path.join(self.storage, filename)
+        Logger.LogInfo(f"Download request for file: {completeName}")
+        with open(completeName, 'rb') as file:
+            file = file.read()
+
+        md5 = hashlib.md5(file)
+        filesize = len(file)
+        self.sendDownloadRequestResponse(file, md5, filesize)
+       
+        totalPackets = math.ceil(filesize / const.CHUNKSIZE)
+        
+        Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
+        self.sendFile(file, const.CHUNKSIZE)
+        print('Finalized downloading file')
+
+    def sendFile(self, file, chunksize):
+        fileSize = len(file)
+        totalPackets = fileSize / chunksize
+        packetsPushed = 0
+        lastPacketSentAt = time.time()
+
+        socketTimeouts = 0
+        while (packetsPushed < totalPackets and socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS):
+            sequenceNumber = (packetsPushed + 1) % 2 # starts in 1
+            payload = file[packetsPushed * chunksize : (packetsPushed + 1) * chunksize]
+            self.sendPacket(sequenceNumber, payload)
+            Logger.LogDebug(f"Sent packet {sequenceNumber}")
+            try:
+                self.socket.settimeout(0.2)
+                ackNseq = self.receiveACK()
+                Logger.LogDebug(f"Received ACK {ackNseq}")
+                socketTimeouts = 0
+                packetsPushed += 1
+                while(ackNseq != sequenceNumber and socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS): # case 4
+                    self.sendPacket(sequenceNumber, payload)
+                    try: 
+                        self.socket.settimeout(0.2)
+                        ackNseq = self.receiveACK()
+                        Logger.LogDebug(f"Re attempted: Received ACK {ackNseq}")
+                        socketTimeouts = 0
+                    except TimeoutError:                
+                        socketTimeouts += 1
+                        Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+                    except:
+                        Logger.LogError("There has been an error receiving the ACK")
+            except TimeoutError:                
+                socketTimeouts += 1
+                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+            except:
+                Logger.LogError("There has been an error receiving the ACK")
+
+            # Case 1: Packet received => ACK received
+            # Case 2: Packet lost => timeout => do nothing (resend)
+            # Case 3: Packet received, ACK lost => timeout => do nothing (resend)
+            # Case 4: ACK not received before timeout => timeout => resend packet => receive ack1 twice (resend next packet)
+            
+
+        self.stopUploading(int(totalPackets + 1))
+
+        print('File transfer has ended.')
+        # Logger.LogInfo(f"Total packets to send: {totalPackets}, nseq: {nseq}, socket timeouts: {socketTimeouts}")
+
+    def sendPacket(self, nseq, payload):
+        opcode = bytes([const.PACKET_OPCODE])
+        checksum = (2).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
+        header = (opcode, checksum, nseqToBytes)
+
+        message = Packet.pack_package(header, payload)
+        self.send(message)
+
+    def send(self, message):
+        self.socket.send(message, self.clientAddress, self.clientPort)
+
+    def sendDownloadRequestResponse(self, md5,fileSize):
+        opcode = bytes([0x11])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseq = (0).to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequestResponse')
+
+        header = (opcode, finalChecksum, nseq)
+        payload = (md5.digest(), fileSize.to_bytes(16, const.BYTEORDER))
+        message = Packet.pack_download_response(header, payload)
+
+        Logger.LogDebug(f"Im sending a packet with opcode: {opcode} and nseq: {nseq}")
+        self.send(message)
+
+        nextPacketIsAnOk = False
+
+        Logger.LogDebug("Im waiting for the ack")
+        receivedOpcode = self.receiveResponseACK()
+
+        while not nextPacketIsAnOk:
+            if receivedOpcode == 2:
+                self.send(message)
+                receivedOpcode = self.receiveResponseACK()
+            else:
+                nextPacketIsAnOk = True
 
     def receivePackage(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
