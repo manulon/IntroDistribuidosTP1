@@ -158,5 +158,5 @@ class ServerStopAndWait:
         print('El archivo se ha descargado! Su contenido es el siguiente:')
         print(content)
 
-    def stopSocket(self):
+    def closeSocket(self):
         self.socket.close()
