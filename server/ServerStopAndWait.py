@@ -155,19 +155,25 @@ class ServerStopAndWait:
         message = Packet.pack_download_response(header, payload)
 
         Logger.LogDebug(f"Im sending a packet with opcode: {Utils.bytesToInt(opcode)} and nseq: {Utils.bytesToInt(nseq)}")
-        self.send(message)
-
-        nextPacketIsAnOk = False
-
         Logger.LogDebug("Im waiting for the ack")
-        receivedOpcode = self.receiveResponseACK()
-
-        while not nextPacketIsAnOk:
-            if receivedOpcode == const.DOWNLOAD_REQUEST_OPCODE: # Client re-sent request
-                self.send(message)
+        
+        nextPacketIsAnOk = False
+        ackReceived = False
+        socketTimeouts = 0
+        while(not ackReceived and socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not nextPacketIsAnOk): # case 4
+            self.send(message)
+            try: 
+                self.socket.settimeout(0.2)
                 receivedOpcode = self.receiveResponseACK()
-            else:
-                nextPacketIsAnOk = True
+                Logger.LogDebug(f"Received Download Response ACK. Opcode: {receivedOpcode}")
+                socketTimeouts = 0
+                if receivedOpcode != const.DOWNLOAD_REQUEST_OPCODE: # If Client re-sent request (not nextPacketIsAnOk), send message again
+                    nextPacketIsAnOk = True
+            except TimeoutError:                
+                socketTimeouts += 1
+                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+            except:
+                Logger.LogError("There has been an error receiving the ACK")
 
     def receivePacket(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
