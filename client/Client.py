@@ -1,5 +1,5 @@
-from socket import *
 from common.Socket import Socket
+
 
 class Client:
     def __init__(self, address, port, storage):
@@ -13,14 +13,18 @@ class Client:
 
     def upload(self, filename):
         self.protocol.upload(filename)
-    
+
     def download(self, filename):
         self.protocol.download(filename)
 
     def setProtocol(self, protocol):
-        protocol.setServerInfo(self.serverAddress, self.serverPort, self.socket)
-        protocol.setStorage(self.storage) # TODO: Agregar función setStorage() en ClienStopAndWait 
+        protocol.setServerInfo(
+            self.serverAddress,
+            self.serverPort,
+            self.socket)
+        # TODO: Agregar función setStorage() en ClienStopAndWait
+        protocol.setStorage(self.storage)
         self.protocol = protocol
-        
+
     def close(self):
         self.socket.close()
