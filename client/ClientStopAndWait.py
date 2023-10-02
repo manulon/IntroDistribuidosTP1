@@ -212,19 +212,38 @@ class ClientStopAndWait:
         print('Finalized uploading file.')
 
     def download(self, fileName):
+        initCommunicationSocketTimeout = 0
+        communicationStarted = False
+        filesize = None
+        md5 = None
         Logger.LogInfo (f"About to start downloading: {fileName}")
+        
         self.sendDownloadRequest(fileName)
-        opcode, fileSize, md5 = self.receiveDownloadResponse()
+        firstPacketSentTime = time.time()
+        while (not communicationStarted) and (initCommunicationSocketTimeout < const.CLIENT_SOCKET_TIMEOUTS):
+            try:
+                self.socket.settimeout(0.2)
+                opcode, fileSize, md5 = self.receiveDownloadResponse()
+                initCommunicationSocketTimeout = 0
+                communicationStarted = True
+                if fileSize >= Utils.getFreeDiskSpace():
+                    Logger.LogError(f"Not enough space for download {fileSize/1000}kB are needed")
+                    return
+                if opcode == const.FILE_DOES_NOT_EXIST_OPCODE:
+                    Logger.LogError(f"File {fileName} does not exist in the server")
+                    return
+                if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
+                    Logger.LogError(f"Unknown error")
+                    return
+            except TimeoutError:                
+                initCommunicationSocketTimeout += 1
+                Logger.LogWarning(f"There has been a timeout (timeout number: {initCommunicationSocketTimeout})")
 
-        if fileSize >= Utils.getFreeDiskSpace():
-            Logger.LogError(f"Not enough space for download {fileSize/1000}kB are needed")
-            return
-        if opcode == const.FILE_DOES_NOT_EXIST_OPCODE:
-            Logger.LogError(f"File {fileName} does not exist in the server")
-            return
-        if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
-            Logger.LogError(f"Unknown error")
-            return
+            if (not communicationStarted) and (time.time() - firstPacketSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                self.sendDownloadRequest(fileName)
+                firstPacketSentTime = time.time()
+
+        Logger.LogDebug(f"You are about to download a file of {fileSize} bytes and with an md5 of {md5}")
 
         self.sendConnectionACK()
         file = []
