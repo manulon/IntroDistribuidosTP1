@@ -50,7 +50,8 @@ class ClientSelectiveRepeat:
 
             self.sendUploadRequest(filename, filesize, md5.digest())
             firstPacketSentTime = time.time()
-
+            
+            errorCode = False
             while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
                     self.socket.settimeout(0.2)
