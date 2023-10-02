@@ -195,3 +195,17 @@ class Packet:
         md5 = payload[1]
 
         return struct.pack(HEADER_FORMAT + DOWNLOAD_RESPONSE_FORMAT, opcode, checksum, nseq, md5, filesize)
+    
+    @staticmethod
+    def unpack_error_message(bytes):
+        opcode, checksum, nseq = struct.unpack(HEADER_FORMAT, bytes)
+        
+        header = {
+            'opcode': Utils.bytesToInt(opcode),
+            'checksum': Utils.bytesToInt(checksum),
+            'nseq': Utils.bytesToInt(nseq)
+        }
+
+        payload = None
+
+        return header, payload
