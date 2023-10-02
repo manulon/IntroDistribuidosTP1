@@ -3,6 +3,8 @@ from common.constants import *
 from common.Socket import *
 from server.UDPServerThread import *
 from server.ServerSelectiveRepeat import *
+from server.ServerStopAndWait import StopAndWait
+
 
 class UDPConnectionAceptorThread(threading.Thread):
 
@@ -29,19 +31,21 @@ class UDPConnectionAceptorThread(threading.Thread):
                                 f"{COLOR_END}"
                                 f" - New UDP Client {clientAddress}"
                                 f":{clientPort} connected.")
+                        
+                        self.lastSocketPort += 1
+                        newSocket = Socket(self.lastSocketPort, self.serverAddress)
+                        
                         match payload['protocol']:
                             case 0: # STOP & WAIT
+                                protocol = StopAndWait(newSocket, clientAddress, clientPort, self.storage)    
                                 print('Seleccionaste stop and wait')
-                            case 1: # SELECTIVE REPEAT    
+
+                            case 1: # SELECTIVE REPEAT
+                                protocol = ServerSelectiveRepeat(newSocket, clientAddress, clientPort, self.storage)
                                 print('Seleccionaste Selective Repeat')
 
-                                self.lastSocketPort += 1
-                                newSocket = Socket(self.lastSocketPort, self.serverAddress)
-                                self.clients[(clientAddress, clientPort)] = UDPServerThread(
-                                    ServerSelectiveRepeat(newSocket, clientAddress, clientPort, self.storage),
-                                    header, payload
-                                )
-                                self.clients[(clientAddress, clientPort)].start()
+                        self.clients[(clientAddress, clientPort)] = UDPServerThread(protocol, header, payload)
+                        self.clients[(clientAddress, clientPort)].start()
                 except:
                     continue
 
