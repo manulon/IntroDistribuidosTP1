@@ -108,6 +108,8 @@ class ClientStopAndWait:
                 Logger.LogError('File too big, not supported by protocol')
             else:
                 Logger.LogError('Uknown error, retry')
+
+            #self.sendACK(0)
             return const.ERROR_CODE
 
         '''

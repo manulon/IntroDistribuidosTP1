@@ -20,13 +20,46 @@ class ServerStopAndWait:
         self.socket.send(message, self.clientAddress, self.clientPort)
 
     def sendFileTransferTypeResponse(self, fileSize):
+        socketTimeouts = 0
+        errorReceived = False
         if fileSize > const.MAX_FILE_SIZE:
             self.sendFileTooBigError()
+            errorPacketSentTime = time.time()
+            while socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not errorReceived:
+                try:
+                    self.socket.settimeout(0.2)
+                    ackNseq = self.receiveACK()
+                    Logger.LogDebug(f"Received ACK {ackNseq}")
+                    socketTimeouts = 0
+                    errorReceived = True
+                except TimeoutError:
+                    # We assume the client has already sent the ACK and closed the connection
+                    Logger.LogWarning("There has been an ACK timeout for an error")
+                    socketTimeouts += 1
+                if (not errorReceived) and (time.time() - errorPacketSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    self.sendFileTooBigError()
+                    errorPacketSentTime = time.time()
             return const.FILE_TOO_BIG_OPCODE
-        elif fileSize > Utils.getFreeDiskSpace():
+        
+        if fileSize > Utils.getFreeDiskSpace():
             self.sendNoDiskSpaceError()
-            return const.NO_DISK_SPACE_OPCODE    
-
+            errorPacketSentTime = time.time()
+            while socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not errorReceived:
+                try:
+                    self.socket.settimeout(0.2)
+                    ackNseq = self.receiveACK()
+                    Logger.LogDebug(f"Received ACK {ackNseq}")
+                    socketTimeouts = 0
+                    errorReceived = True
+                except TimeoutError:
+                    # We assume the client has already sent the ACK and closed the connection
+                    Logger.LogWarning("There has been an ACK timeout for an error")
+                    socketTimeouts += 1
+                if (not errorReceived) and (time.time() - errorPacketSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    self.sendNoDiskSpaceError()
+                    errorPacketSentTime = time.time()
+            return const.NO_DISK_SPACE_OPCODE
+            
         opcode = bytes([const.FILE_TRANSFER_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
@@ -113,7 +146,23 @@ class ServerStopAndWait:
                 file = file.read()
         except FileNotFoundError:
             Logger.LogError(f"File {filename} not found")
+            socketTimeouts = 0
+            errorReceived = False
             self.sendFileDoesNotExistError()
+            errorPacketSentTime = time.time()
+            while socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS and not errorReceived:
+                try:
+                    self.socket.settimeout(0.2)
+                    ackNseq = self.receiveACK()
+                    Logger.LogDebug(f"Received ACK {ackNseq}")
+                    socketTimeouts = 0
+                    errorReceived = True
+                except TimeoutError:
+                    Logger.LogError("TimeoutError")
+                    socketTimeouts += 1
+                if (not errorReceived) and (time.time() - errorPacketSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    self.sendFileDoesNotExistError()
+                    errorPacketSentTime = time.time()
             return
 
         md5 = hashlib.md5(file)
