@@ -33,94 +33,97 @@ class ClientSelectiveRepeat:
         self.socket.send(message, self.serverAddress, self.serverPort)
         
     def upload(self, filename):
-        Logger.LogInfo (f"About to start uploading: {filename}")
         self.window = []
         initCommunicationSocketTimeout = 0
         communicationStarted = False
         
-        file:bytes        
-        with open(filename, 'rb') as file:
-            file = file.read()
-            
-        md5 = hashlib.md5(file)
-        filesize = len(file)
-        totalPackets = math.ceil(filesize / CHUNKSIZE)
-        
-        Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
-        
-        self.sendUploadRequest(filename, filesize, md5.digest())
-        firstPacketSentTime = time.time()
+        try:
+            file:bytes        
+            with open(filename, 'rb') as file:
+                file = file.read()
 
-        while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
-            try:
-                self.socket.settimeout(0.2)
-                self.receiveFileTransferTypeResponse()
-                initCommunicationSocketTimeout = 0
-                communicationStarted = True
-            except TimeoutError:                
-                initCommunicationSocketTimeout += 1
-                Logger.LogWarning(f"There has been a timeout (timeout number: {initCommunicationSocketTimeout})")
+            md5 = hashlib.md5(file)
+            filesize = len(file)
+            totalPackets = math.ceil(filesize / CHUNKSIZE)
 
-            if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                self.sendUploadRequest(filename, filesize, md5.digest())
-                firstPacketSentTime = time.time()
+            Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
 
-        Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
-        packetsACKed = 0
-        packetsPushed = 0
-        nseq = 1
-        payloadWithNseq = {}
-        socketTimeouts = 0        
-        
-        while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
-            for i in tqdm (range (totalPackets),desc="Uploading...",ascii=False, ncols=75):
-                while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
-                    payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
-                    payloadWithNseq[nseq] = payloadAux
-                    self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
-                    packetsPushed += 1
-                    nseq += 1
+            self.sendUploadRequest(filename, filesize, md5.digest())
+            firstPacketSentTime = time.time()
 
-                for e in self.window:
-                    if not e['isSent']:
-                        Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
-                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                        e['sentAt'] = time.time()
-                        e['isSent'] = True
-                
-                ackReceived = None
-
+            while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
                     self.socket.settimeout(0.2)
-                    ackReceived = self.receiveACK()
-                    socketTimeouts = 0
+                    self.receiveFileTransferTypeResponse()
+                    initCommunicationSocketTimeout = 0
+                    communicationStarted = True
                 except TimeoutError:                
-                    socketTimeouts += 1
-                    Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-                except:
-                    Logger.LogError("There has been an error receiving the ACK")
+                    initCommunicationSocketTimeout += 1
+                    Logger.LogWarning(f"There has been a timeout (timeout number: {initCommunicationSocketTimeout})")
 
-                for e in self.window:
+                if (not communicationStarted) and (time.time() - firstPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    self.sendUploadRequest(filename, filesize, md5.digest())
+                    firstPacketSentTime = time.time()
 
-                    if (not e['isACKed']) and ackReceived == e['nseq']:
-                        e['isACKed'] = True
-                        packetsACKed += 1
-                        Logger.LogDebug(f"ACKed {packetsACKed} packets")  
-                    if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                        if (e['nseq'] != totalPackets):
+            Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
+            packetsACKed = 0
+            packetsPushed = 0
+            nseq = 1
+            payloadWithNseq = {}
+            socketTimeouts = 0        
+
+            while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
+                for i in tqdm (range (totalPackets),desc="Uploading...",ascii=False, ncols=75):
+                    while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
+                        payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
+                        payloadWithNseq[nseq] = payloadAux
+                        self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
+                        packetsPushed += 1
+                        nseq += 1
+
+                    for e in self.window:
+                        if not e['isSent']:
+                            Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
                             self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                        else:
-                            self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                        e['sentAt'] = time.time()
+                            e['sentAt'] = time.time()
+                            e['isSent'] = True
 
-                if self.window[0]['isACKed']:
-                    Logger.LogDebug("Moving window")
-                    self.moveSendWindow()
+                    ackReceived = None
 
-        print("Verifying file...")
-        self.stopUploading(int(totalPackets + 1))
+                    try:
+                        self.socket.settimeout(0.2)
+                        ackReceived = self.receiveACK()
+                        socketTimeouts = 0
+                    except TimeoutError:                
+                        socketTimeouts += 1
+                        Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+                    except:
+                        Logger.LogError("There has been an error receiving the ACK")
 
-        print('File transfer has completed.')
+                    for e in self.window:
+
+                        if (not e['isACKed']) and ackReceived == e['nseq']:
+                            e['isACKed'] = True
+                            packetsACKed += 1
+                            Logger.LogDebug(f"ACKed {packetsACKed} packets")  
+                        if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                            if (e['nseq'] != totalPackets):
+                                self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                            else:
+                                self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                            e['sentAt'] = time.time()
+
+                    if self.window[0]['isACKed']:
+                        Logger.LogDebug("Moving window")
+                        self.moveSendWindow()
+
+            print("Verifying file...")
+            self.stopUploading(int(totalPackets + 1))
+
+            print('File transfer has completed.')
+        
+        except FileNotFoundError:
+            Logger.LogError("The file does not exist. You can't upload it.")
 
     def sendUploadRequest(self, fileName, fileSize, md5):
         opcode = bytes([UPLOAD_REQUEST_OPCODE])
@@ -210,11 +213,11 @@ class ClientSelectiveRepeat:
         self.send(message)
 
     def download(self, filename):
-        Logger.LogInfo (f"About to start downloading: {filename}")
         self.window = []
         initCommunicationSocketTimeout = 0
         communicationStarted = False
-           
+        errorCode = False
+
         self.sendDownloadRequest(filename)
         firstPacketSentTime = time.time()
 
@@ -224,7 +227,10 @@ class ClientSelectiveRepeat:
         while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
             try:
                 self.socket.settimeout(0.2)
-                filesize, md5 = self.receiveDownloadResponse()
+                receivedMessageHeader, receivedMessagePayload = self.receiveDownloadResponse()
+                if (receivedMessageHeader['opcode']) == 12:
+                    self.sendACK(0)
+                    errorCode = True
                 initCommunicationSocketTimeout = 0
                 communicationStarted = True
             except TimeoutError:                
@@ -235,50 +241,54 @@ class ClientSelectiveRepeat:
                 self.sendDownloadRequest(filename)
                 firstPacketSentTime = time.time()
 
-        Logger.LogDebug(f"You are about to download a file of {filesize} bytes and with an md5 of {md5}")
+        if not errorCode:
+            Logger.LogDebug(f"You are about to download a file of {filesize} bytes and with an md5 of {md5}")
 
-        # POLITICA DE REINTENTOS #
-        self.sendConnectionACK()
+            # POLITICA DE REINTENTOS #
+            self.sendConnectionACK()
 
-        fileNameModified = filename.rstrip('\x00')
-        file = {}
-        totalPackets = math.ceil(filesize / CHUNKSIZE)
-        distinctAcksSent = 0
-        firstIteration = True
+            fileNameModified = filename.rstrip('\x00')
+            file = {}
+            totalPackets = math.ceil(filesize / CHUNKSIZE)
+            distinctAcksSent = 0
+            firstIteration = True
 
-        for i in range(1,10):
-            self.window.append({'nseq': i, 'isACKSent': False})
+            for i in range(1,10):
+                self.window.append({'nseq': i, 'isACKSent': False})
 
-        header = None
-        payload = None
+            header = None
+            payload = None
 
-        while distinctAcksSent != totalPackets:
-            if not firstIteration:
-                header, payload = self.receivePacket()
-            else:
-                firstIteration = False
+            while distinctAcksSent != totalPackets:
+                if not firstIteration:
+                    header, payload = self.receivePackage()
+                else:
+                    firstIteration = False
 
-            if header != None and self.isChecksumOK(header, payload):
-                self.sendACK(header['nseq'])
-            
-            for e in self.window:
-                if header != None and (not e['isACKSent']) and header['nseq'] == e['nseq']:
-                    e['isACKSent'] = True
-                    distinctAcksSent += 1
-                    file[header['nseq'] - 1] = payload
-                  
-            if header != None and header['nseq'] == self.window[0]['nseq']:
-                self.moveReceiveWindow()
+                if header != None and self.isChecksumOK(header, payload):
+                    self.sendACK(header['nseq'])
 
-        bytesInLatestPacket = filesize % CHUNKSIZE
-        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
-        file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
-        Logger.LogWarning(f"Padding removed")
-        self.saveFile(file, fileNameModified)
+                for e in self.window:
+                    if header != None and (not e['isACKSent']) and header['nseq'] == e['nseq']:
+                        e['isACKSent'] = True
+                        distinctAcksSent += 1
+                        file[header['nseq'] - 1] = payload
 
-        self.stopFileTransfer(totalPackets+1, fileNameModified, md5)
+                if header != None and header['nseq'] == self.window[0]['nseq']:
+                    self.moveReceiveWindow()
 
-        print('File transfer has ended.')
+            bytesInLatestPacket = filesize % CHUNKSIZE
+            Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
+            file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
+            Logger.LogWarning(f"Padding removed")
+            self.saveFile(file, fileNameModified)
+
+            self.stopFileTransfer(totalPackets+1, fileNameModified, md5)
+
+            print('File transfer has ended.')
+        
+        else:
+            Logger.LogError("The file does not exist in the server. You can't download it.")
 
     def sendDownloadRequest(self, fileName):
         opcode = bytes([0x2])
@@ -300,9 +310,16 @@ class ClientSelectiveRepeat:
         self.serverAddress = udpServerThreadAddress
         self.serverPort = udpServerThreadPort
 
-        header, payload = Packet.unpack_download_response(received_message)
+        Logger.LogDebug(Utils.bytesToInt(received_message[:1]))
 
-        return payload['filesize'], payload['md5']
+        if Utils.bytesToInt(received_message[:1]) == 12:
+            Logger.LogDebug('}aaa')
+            header, payload = Packet.unpack_error_message(received_message)
+        else:
+            Logger.LogDebug('sdfsdf')
+            header, payload = Packet.unpack_download_response(received_message)
+
+        return header, payload
     
     def receivePacket(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(PACKET_SIZE)
