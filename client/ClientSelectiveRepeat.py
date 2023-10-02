@@ -54,7 +54,10 @@ class ClientSelectiveRepeat:
             while (not communicationStarted) and (initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
                     self.socket.settimeout(0.2)
-                    self.receiveFileTransferTypeResponse()
+                    receivedMessageHeader, receivedMessagePayload = self.receiveFileTransferTypeResponse()
+                    if (receivedMessageHeader['opcode']) == 13:
+                        self.sendACK(0)
+                        errorCode = True
                     initCommunicationSocketTimeout = 0
                     communicationStarted = True
                 except TimeoutError:                
@@ -65,63 +68,67 @@ class ClientSelectiveRepeat:
                     self.sendUploadRequest(filename, filesize, md5.digest())
                     firstPacketSentTime = time.time()
 
-            Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
-            packetsACKed = 0
-            packetsPushed = 0
-            nseq = 1
-            payloadWithNseq = {}
-            socketTimeouts = 0        
+            if not errorCode:
+                Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
+                packetsACKed = 0
+                packetsPushed = 0
+                nseq = 1
+                payloadWithNseq = {}
+                socketTimeouts = 0        
 
-            while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
-                for i in tqdm (range (totalPackets),desc="Uploading...",ascii=False, ncols=75):
-                    while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
-                        payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
-                        payloadWithNseq[nseq] = payloadAux
-                        self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
-                        packetsPushed += 1
-                        nseq += 1
+                while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
+                    for i in tqdm (range (totalPackets),desc="Uploading...",ascii=False, ncols=75):
+                        while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
+                            payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
+                            payloadWithNseq[nseq] = payloadAux
+                            self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
+                            packetsPushed += 1
+                            nseq += 1
 
-                    for e in self.window:
-                        if not e['isSent']:
-                            Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
-                            self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                            e['sentAt'] = time.time()
-                            e['isSent'] = True
-
-                    ackReceived = None
-
-                    try:
-                        self.socket.settimeout(0.2)
-                        ackReceived = self.receiveACK()
-                        socketTimeouts = 0
-                    except TimeoutError:                
-                        socketTimeouts += 1
-                        Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-                    except:
-                        Logger.LogError("There has been an error receiving the ACK")
-
-                    for e in self.window:
-
-                        if (not e['isACKed']) and ackReceived == e['nseq']:
-                            e['isACKed'] = True
-                            packetsACKed += 1
-                            Logger.LogDebug(f"ACKed {packetsACKed} packets")  
-                        if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                            if (e['nseq'] != totalPackets):
+                        for e in self.window:
+                            if not e['isSent']:
+                                Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
                                 self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                            else:
-                                self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                            e['sentAt'] = time.time()
+                                e['sentAt'] = time.time()
+                                e['isSent'] = True
 
-                    if self.window[0]['isACKed']:
-                        Logger.LogDebug("Moving window")
-                        self.moveSendWindow()
+                        ackReceived = None
 
-            print("Verifying file...")
-            self.stopUploading(int(totalPackets + 1))
+                        try:
+                            self.socket.settimeout(0.2)
+                            ackReceived = self.receiveACK()
+                            socketTimeouts = 0
+                        except TimeoutError:                
+                            socketTimeouts += 1
+                            Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+                        except:
+                            Logger.LogError("There has been an error receiving the ACK")
 
-            print('File transfer has completed.')
+                        for e in self.window:
+
+                            if (not e['isACKed']) and ackReceived == e['nseq']:
+                                e['isACKed'] = True
+                                packetsACKed += 1
+                                Logger.LogDebug(f"ACKed {packetsACKed} packets")  
+                            if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                                if (e['nseq'] != totalPackets):
+                                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                                else:
+                                    self.sendLastPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                                e['sentAt'] = time.time()
+
+                        if self.window[0]['isACKed']:
+                            Logger.LogDebug("Moving window")
+                            self.moveSendWindow()
+
+                print("Verifying file...")
+                self.stopUploading(int(totalPackets + 1))
+
+                print('File transfer has completed.')
         
+            else:
+                Logger.LogError(f"The transaction could not be completed because the server has not enough space to allocate the file")             
+
         except FileNotFoundError:
             Logger.LogError("The file does not exist. You can't upload it.")
 
@@ -145,8 +152,13 @@ class ClientSelectiveRepeat:
         self.serverAddress = udpServerThreadAddress
         self.serverPort = udpServerThreadPort
 
-        header, payload = Packet.unpack_file_transfer_type_response(received_message)
-        self.chunksize = payload['chunksize']
+        if Utils.bytesToInt(received_message[:1]) == 13:
+            header, payload = Packet.unpack_error_message(received_message)
+        else:
+            header, payload = Packet.unpack_file_transfer_type_response(received_message)
+            self.chunksize = payload['chunksize']
+
+        return header, payload
         
     def sendPackage(self, payload, nseq):
         opcode = bytes([PACKET_OPCODE])
@@ -243,6 +255,12 @@ class ClientSelectiveRepeat:
 
         if not errorCode:
             filesize = receivedMessagePayload['filesize']
+
+            if not self.isFileSizeOk(filesize):
+                Logger.LogError(f"Not enough space for download {filesize/1000}kB are needed")
+                self.sendNoDiskSpaceErrorPacket()
+                return             
+            
             md5 = receivedMessagePayload['md5']
 
             Logger.LogDebug(f"You are about to download a file of {filesize} bytes and with an md5 of {md5}")
@@ -313,13 +331,9 @@ class ClientSelectiveRepeat:
         self.serverAddress = udpServerThreadAddress
         self.serverPort = udpServerThreadPort
 
-        Logger.LogDebug(Utils.bytesToInt(received_message[:1]))
-
         if Utils.bytesToInt(received_message[:1]) == 12:
-            Logger.LogDebug('}aaa')
             header, payload = Packet.unpack_error_message(received_message)
         else:
-            Logger.LogDebug('sdfsdf')
             header, payload = Packet.unpack_download_response(received_message)
 
         return header, payload
@@ -403,3 +417,17 @@ class ClientSelectiveRepeat:
     
         self.send(message)
         
+    def isFileSizeOk(self, filesize):
+        return filesize <= Utils.getFreeDiskSpace()
+    
+    def sendNoDiskSpaceErrorPacket(self):
+        opcode = bytes([NO_DISK_SPACE_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseqToBytes = (0).to_bytes(4, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        
+        message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending not enough space error.")
+        
+        self.send(message)
