@@ -36,7 +36,7 @@ class UDPConnectionAceptorThread(threading.Thread):
                         newSocket = Socket(self.lastSocketPort, self.serverAddress)
                         
                         match payload['protocol']:
-                            case 0: # STOP & WAIT
+                            case 2: # STOP & WAIT
                                 protocol = ServerStopAndWait(newSocket, clientAddress, clientPort, self.storage)    
                                 print('Seleccionaste stop and wait')
 
