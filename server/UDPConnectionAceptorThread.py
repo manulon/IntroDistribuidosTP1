@@ -1,6 +1,7 @@
 import threading
 from common.constants import *
 from common.Socket import *
+from server.ServerStopAndWait import ServerStopAndWait
 from server.UDPServerThread import *
 from server.ServerSelectiveRepeat import *
 from server.ServerStopAndWait import ServerStopAndWait
@@ -37,15 +38,15 @@ class UDPConnectionAceptorThread(threading.Thread):
                         
                         match payload['protocol']:
                             case 2: # STOP & WAIT
-                                protocol = ServerStopAndWait(newSocket, clientAddress, clientPort, self.storage)    
-                                print('Seleccionaste stop and wait')
+                                protocol = ServerStopAndWait(newSocket, clientAddress, clientPort, self.storage)
+                                Logger.LogInfo('Selected stop and wait')
 
                             case 1: # SELECTIVE REPEAT
                                 protocol = ServerSelectiveRepeat(newSocket, clientAddress, clientPort, self.storage)
-                                print('Seleccionaste Selective Repeat')
+                                Logger.LogInfo('Selected Selective Repeat')
 
                         self.clients[(clientAddress, clientPort)] = UDPServerThread(protocol, header, payload)
-                        self.clients[(clientAddress, clientPort)].start()
+                        self.clients[(clientAddress, clientPort)].run()
                 except:
                     continue
 

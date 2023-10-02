@@ -5,7 +5,7 @@ from common.Logger import Logger
 from common.Checksum import Checksum
 from common.Packet import Packet
 import common.constants as const
-
+from common.Utils import Utils
 
 class ServerStopAndWait:
     def __init__(self, socket, clientAddress, clientPort, storage):
@@ -45,13 +45,15 @@ class ServerStopAndWait:
                 # package = Packet.pack_package(header, payload)
                 # if self.isChecksumOK(header, payload):
                 self.sendACK(header['nseq'])
+                Logger.LogDebug(f"Sent ACK {header['nseq']}")
                 file.append(payload)
                 nextNseq = acksSent % 2
                 acksSent += 1
-                # else:
-                #    Logger.LogError('Checksum error') # client resends packet (corrupted packet)
-            else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
-                self.sendACK(header['nseq'])  # server only resends ACK (detects duplicate)
+                #else:
+                    #Logger.LogError('Checksum error') # client resends packet (corrupted packet)
+            else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
+                self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
+                Logger.LogDebug(f"RE-Sent ACK {header['nseq']}")
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
         Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
@@ -69,7 +71,10 @@ class ServerStopAndWait:
 
     def receivePackage(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
-        header, payload = Packet.unpack_package(received_message)
+        if Utils.bytesToInt(received_message[:1]) == 0:
+            header, payload = Packet.unpack_upload_request(received_message)
+        else:
+            header, payload = Packet.unpack_package(received_message)
         return header, payload
 
     def sendACK(self, nseq):
@@ -105,12 +110,6 @@ class ServerStopAndWait:
         nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
-
-        # file:bytes
-        # completeName = os.path.join(self.storage, fileName)
-        # with open(completeName, 'rb') as file:
-        #    file = file.read()
-
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)
 
@@ -121,16 +120,16 @@ class ServerStopAndWait:
         stopCommunicationSocketTimeout = 0
 
         while (not communicationFinished) and (stopCommunicationSocketTimeout < const.LAST_ACK_PACKET_TIMEOUT):
-            try:
-                self.socket.settimeout(0.2)
-                received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
-                stopCommunicationSocketTimeout = 0
-                communicationFinished = True
-            except TimeoutError:
-                # Acá se da por sentado que el cliente se cerró
-                stopCommunicationSocketTimeout += 1
+           try:
+               self.socket.settimeout(0.2)
+               received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
+               stopCommunicationSocketTimeout = 0
+               communicationFinished = True
+           except TimeoutError:
+               # We assume the client has already sent the ACK and closed the connection
+               stopCommunicationSocketTimeout += 1
 
-            if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+           if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
                 self.send(message)
                 stopFileTransferMsgSentAt = time.time()
 

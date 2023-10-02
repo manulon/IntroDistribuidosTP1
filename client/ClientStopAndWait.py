@@ -1,5 +1,6 @@
 import hashlib
 import math
+import time
 from common.Checksum import Checksum
 from common.Logger import Logger
 from common.Packet import Packet
@@ -21,15 +22,37 @@ class ClientStopAndWait:
     def upload(self, filename):
         Logger.LogInfo(f"About to start uploading: {filename}")
 
-        file: bytes
-        with open(filename, 'rb') as file:
-            file = file.read()
-
+        file:bytes
+        try:        
+            with open(filename, 'rb') as file:
+                file = file.read()
+        except FileNotFoundError:
+            Logger.LogError(f"File {filename} not found")
+            return
+            
         md5 = hashlib.md5(file)
         filesize = len(file)
 
         self.sendUploadRequest(filename, filesize, md5.digest())
-        chunksize = self.receiveFileTransferTypeResponse()
+        firstPacketSentTime = time.time()
+        communicationStarted = False
+        initCommunicationSocketTimeout = 0
+
+        chunksize = const.ERROR_CODE
+        while (not communicationStarted) and (initCommunicationSocketTimeout < const.CLIENT_SOCKET_TIMEOUTS):
+            try:
+                self.socket.settimeout(0.2)
+                chunksize = self.receiveFileTransferTypeResponse()
+                initCommunicationSocketTimeout = 0
+                communicationStarted = True
+            except TimeoutError:           
+                initCommunicationSocketTimeout += 1
+                Logger.LogWarning(f"There has been a timeout (timeout number: {initCommunicationSocketTimeout})")
+
+            if (not communicationStarted) and (time.time() - firstPacketSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                self.sendUploadRequest(filename, filesize, md5.digest())
+                firstPacketSentTime = time.time()
+        
         if chunksize == const.ERROR_CODE:
             return
 
@@ -97,19 +120,43 @@ class ClientStopAndWait:
         fileSize = len(file)
         totalPackets = fileSize / chunksize
         packetsPushed = 0
+        lastPacketSentAt = time.time()
 
-        while (packetsPushed < totalPackets):
-            sequenceNumber = (packetsPushed + 1) % 2  # starts in 1
-            payload = file[packetsPushed *
-                           chunksize: (packetsPushed + 1) * chunksize]
+        socketTimeouts = 0
+        while (packetsPushed < totalPackets and socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS):
+            sequenceNumber = (packetsPushed + 1) % 2 # starts in 1
+            payload = file[packetsPushed * chunksize : (packetsPushed + 1) * chunksize]
             self.sendPacket(sequenceNumber, payload)
-            ackNseq = self.receiveACK()
-            if (ackNseq == sequenceNumber):
+            Logger.LogDebug(f"Sent packet {sequenceNumber}")
+            try:
+                self.socket.settimeout(0.2)
+                ackNseq = self.receiveACK()
+                Logger.LogDebug(f"Received ACK {ackNseq}")
+                socketTimeouts = 0
                 packetsPushed += 1
-            else:
-                while(ackNseq != sequenceNumber):  # case 4
+                while(ackNseq != sequenceNumber and socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS): # case 4
                     self.sendPacket(sequenceNumber, payload)
-                    ackNseq = self.receiveACK()
+                    try: 
+                        self.socket.settimeout(0.2)
+                        ackNseq = self.receiveACK()
+                        Logger.LogDebug(f"Re attempted: Received ACK {ackNseq}")
+                        socketTimeouts = 0
+                    except TimeoutError:                
+                        socketTimeouts += 1
+                        Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+                    except:
+                        Logger.LogError("There has been an error receiving the ACK")
+            except TimeoutError:                
+                socketTimeouts += 1
+                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+            except:
+                Logger.LogError("There has been an error receiving the ACK")
+
+            # Case 1: Packet received => ACK received
+            # Case 2: Packet lost => timeout => do nothing (resend)
+            # Case 3: Packet received, ACK lost => timeout => do nothing (resend)
+            # Case 4: ACK not received before timeout => timeout => resend packet => receive ack1 twice (resend next packet)
+            
 
         self.stopUploading(int(totalPackets + 1))
 
@@ -129,7 +176,6 @@ class ClientStopAndWait:
         self.socket.send(message, self.serverAddress, self.serverPort)
 
     def receiveACK(self):
-        # timeout?
         received_message, _ = self.socket.receive(const.ACK_SIZE)
         header = Packet.unpack_ack(received_message)
         return header['nseq']
