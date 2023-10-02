@@ -5,6 +5,7 @@ from common.Checksum import Checksum
 from common.Logger import Logger
 from common.Packet import Packet
 import common.constants as const
+import common.Utils as u
 
 
 class ClientStopAndWait:
@@ -207,27 +208,22 @@ class ClientStopAndWait:
         print('Finalized uploading file.')
 
     def download(self, filename):
+        Logger.LogInfo (f"About to start downloading: {filename}")
         self.sendDownloadRequest(filename)
-        '''
-            Enviar download request con filename
-            Esperar respuesta del servidor
-            tomar tamano del archivo y chunksize
-            Verificar si hay espacio en disco para la descarga
-            paquetesTotales = tam/chunksize
-            md5 = md5 del server
-            enviar OK al servidor
-            Mientras ACKs enviados < PaquetesTotales
-                esperar a recibir paquete
-                if cheksum y nseq OK
-                    Mandar Ack del paquete
-                    appendear bytes del payload
-                    acks enviados ++
-                else
-                    solo mandar ack pues el servidor hizo una retransmision por perdida
-            verificar mda5
-            if mda5 bien
-                ENVIAR ok final y retornar
-        '''
+        filesize, md5 = self.receiveDownloadResponse()
+        if filesize >= u.getFreeDiskSpace():
+            Logger.LogError(f"Not enough space for download {filesize/1000}kB are needed")
+            return
+        
+        totalPackets = filesize / const.CHUNKSIZE
+        acksSent = 0
+        # enviar ok al servidor para que arranque la descarga
+        while acksSent < totalPackets:
+            #recibir paquete
+            #verificar checksum y nseq
+            #mandarAcks del pack
+            #appendear bytes
+            acksSent += 1
 
     def sendDownloadRequest(self, fileName):
             opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
@@ -244,3 +240,11 @@ class ClientStopAndWait:
                 fileName)
             message = Packet.pack_package(header, payload)
             self.send(message)
+
+    def receiveDownloadResponse(self):
+        received_message, (udpServerThreadAddress, udpServerThreadPort) = self.socket.receive(const.DOWNLOAD_RESPONSE_SIZE)
+        self.serverAddress = udpServerThreadAddress
+        self.serverPort = udpServerThreadPort
+        _, payload = Packet.unpack_download_response(received_message)
+        return payload['filesize'], payload['md5']
+        
