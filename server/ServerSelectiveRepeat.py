@@ -180,8 +180,7 @@ class ServerSelectiveRepeat:
 
                 if (not fileNotExistPacketACKed) and (time.time() - fileNotExistPacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
                     self.sendFileNotExistPacket()
-                    fileNotExistPacketSentTime = time.time()
-                        
+                    fileNotExistPacketSentTime = time.time()             
 
     def sendDownloadRequestResponse(self, file):
         opcode = bytes([DOWNLOAD_REQUEST_RESPONSE_OPCODE])

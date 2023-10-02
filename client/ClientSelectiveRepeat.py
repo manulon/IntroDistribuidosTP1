@@ -242,6 +242,9 @@ class ClientSelectiveRepeat:
                 firstPacketSentTime = time.time()
 
         if not errorCode:
+            filesize = receivedMessagePayload['filesize']
+            md5 = receivedMessagePayload['md5']
+
             Logger.LogDebug(f"You are about to download a file of {filesize} bytes and with an md5 of {md5}")
 
             # POLITICA DE REINTENTOS #
@@ -261,7 +264,7 @@ class ClientSelectiveRepeat:
 
             while distinctAcksSent != totalPackets:
                 if not firstIteration:
-                    header, payload = self.receivePackage()
+                    header, payload = self.receivePacket()
                 else:
                     firstIteration = False
 
