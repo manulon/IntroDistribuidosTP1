@@ -179,7 +179,6 @@ class ClientSelectiveRepeat:
         received_message, (serverAddres, serverPort) = self.socket.receive(STOP_FILE_TRANSFER_SIZE)
 
         header, payload = Packet.unpack_stop_file_transfer(received_message)
-        Logger.LogInfo(f"Received ACK: {header['nseq']}")
 
         if payload["state"] == 0:
             Logger.LogError("There's been an error uploading the file in the server. File corrupt in the server")

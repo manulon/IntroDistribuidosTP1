@@ -87,6 +87,8 @@ class ServerSelectiveRepeat:
 
         self.stopFileTransfer(totalPackets+1, fileName, originalMd5)
 
+        print('Finalized uploading file')
+
     def download(self, filename): 
         self.window = []      
         filename = filename.rstrip('\x00')
@@ -283,6 +285,8 @@ class ServerSelectiveRepeat:
         message = Packet.pack_stop_file_transfer(header, payload)
     
         self.send(message)
+        Logger.LogWarning(f"Sending this: {header} and this {payload}")
+
         stopFileTransferMsgSentAt = time.time()
 
         communicationFinished = False
