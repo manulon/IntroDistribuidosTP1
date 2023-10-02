@@ -50,44 +50,70 @@ class ServerSelectiveRepeat:
         return receivedPacketHeader, receivedPacketPayload
             
     def upload(self, filesize, fileName, originalMd5):
-        self.window = []
-        fileName = fileName.rstrip('\x00')
-        header, payload = self.sendFileTransferTypeResponse()
-        file = {}
-        totalPackets = math.ceil(filesize / CHUNKSIZE)
-        distinctAcksSent = 0
-        firstIteration = True
+        filesize = 4902384039840983409234665468245454645432465432146545453165156123165464543213545168151351654
+        if filesize >= Utils.getFreeDiskSpace():           
+            noDiskSpacePacketTimeout = 0
+            noDiskSpacePacketACKed = False
+            noDiskSpacePacketSentTime = time.time()
+            self.sendNoDiskSpaceErrorPacket()
 
-        for i in range(1,10):
-            self.window.append({'nseq': i, 'isACKSent': False})
+            while (not noDiskSpacePacketACKed) and (noDiskSpacePacketTimeout < CLIENT_SOCKET_TIMEOUTS):
+                try:
+                    self.socket.settimeout(0.2)
+                    nseq = self.receiveACK()
+                    if nseq == 0:
+                        noDiskSpacePacketTimeout = 0
+                        noDiskSpacePacketACKed = True
+                except TimeoutError:                
+                    noDiskSpacePacketTimeout += 1
+                    Logger.LogWarning(f"There has been a timeout (timeout number: {noDiskSpacePacketTimeout})")
 
-        while distinctAcksSent != totalPackets:
-            if not firstIteration:
-                header, payload = self.receivePackage()
-            else:
-                firstIteration = False
+                if (not noDiskSpacePacketACKed) and (time.time() - noDiskSpacePacketSentTime > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    Logger.LogDebug(f"Enviando el reintento")
+                    self.sendNoDiskSpaceErrorPacket()
+                    noDiskSpacePacketSentTime = time.time()  
 
-            if self.isChecksumOK(header, payload):
-                self.sendACK(header['nseq'])
-            
-            for e in self.window:
-                if (not e['isACKSent']) and header['nseq'] == e['nseq']:
-                    e['isACKSent'] = True
-                    distinctAcksSent += 1
-                    file[header['nseq'] - 1] = payload
-                              
-            if header['nseq'] == self.window[0]['nseq']:
-                self.moveReceiveWindow()
+            Logger.LogError(f"Not enough space for download {filesize/1000}kB are needed") 
 
-        bytesInLatestPacket = filesize % CHUNKSIZE
-        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
-        file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
-        Logger.LogWarning(f"Padding removed")
-        self.saveFile(file, fileName)
+        else:
+            self.window = []
+            fileName = fileName.rstrip('\x00')
+            header, payload = self.sendFileTransferTypeResponse()
+            file = {}
+            totalPackets = math.ceil(filesize / CHUNKSIZE)
+            distinctAcksSent = 0
+            firstIteration = True
 
-        self.stopFileTransfer(totalPackets+1, fileName, originalMd5)
+            for i in range(1,10):
+                self.window.append({'nseq': i, 'isACKSent': False})
 
-        print('Finalized uploading file')
+            while distinctAcksSent != totalPackets:
+                if not firstIteration:
+                    header, payload = self.receivePackage()
+                else:
+                    firstIteration = False
+
+                if self.isChecksumOK(header, payload):
+                    self.sendACK(header['nseq'])
+
+                for e in self.window:
+                    if (not e['isACKSent']) and header['nseq'] == e['nseq']:
+                        e['isACKSent'] = True
+                        distinctAcksSent += 1
+                        file[header['nseq'] - 1] = payload
+
+                if header['nseq'] == self.window[0]['nseq']:
+                    self.moveReceiveWindow()
+
+            bytesInLatestPacket = filesize % CHUNKSIZE
+            Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
+            file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
+            Logger.LogWarning(f"Padding removed")
+            self.saveFile(file, fileName)
+
+            self.stopFileTransfer(totalPackets+1, fileName, originalMd5)
+
+            print('Finalized uploading file')
 
     def download(self, filename): 
         self.window = []      
@@ -100,66 +126,66 @@ class ServerSelectiveRepeat:
             with open(completeName, 'rb') as file:
                 file = file.read()
 
-            self.sendDownloadRequestResponse(file)
+            errorCode = self.sendDownloadRequestResponse(file)
 
-            # AQUI YA RECIBIÓ EL OK, POR LO QUE DEBE COMENZAR A MANDAR 
-            # PAQUETES AL CLIENTE.       
+            if not errorCode:
+                md5 = hashlib.md5(file)
+                filesize = len(file)
+                totalPackets = math.ceil(filesize / CHUNKSIZE)
 
-            md5 = hashlib.md5(file)
-            filesize = len(file)
-            totalPackets = math.ceil(filesize / CHUNKSIZE)
+                Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
 
-            Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
+                packetsACKed = 0
+                packetsPushed = 0
+                nseq = 1
+                payloadWithNseq = {}
+                socketTimeouts = 0
 
-            packetsACKed = 0
-            packetsPushed = 0
-            nseq = 1
-            payloadWithNseq = {}
-            socketTimeouts = 0
+                while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
+                    while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
+                        payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
+                        payloadWithNseq[nseq] = payloadAux
+                        self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
+                        packetsPushed += 1
+                        nseq += 1
 
-            while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
-                while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
-                    payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
-                    payloadWithNseq[nseq] = payloadAux
-                    self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
-                    packetsPushed += 1
-                    nseq += 1
-
-                for e in self.window:
-                    if not e['isSent']:
-                        Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
-                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                        e['sentAt'] = time.time()
-                        e['isSent'] = True
-
-                ackReceived = None
-
-                try:
-                    self.socket.settimeout(0.2)
-                    ackReceived = self.receiveACK()
-                    socketTimeouts = 0
-                except TimeoutError:                
-                    socketTimeouts += 1
-                    Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-                except:
-                    Logger.LogError("There has been an error receiving the ACK")
-
-                for e in self.window:
-                    if (not e['isACKed']) and ackReceived == e['nseq']:
-                        e['isACKed'] = True
-                        packetsACKed += 1
-                        Logger.LogDebug(f"ACKed {packetsACKed} packets")  
-                    if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    for e in self.window:
+                        if not e['isSent']:
+                            Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
                             self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
                             e['sentAt'] = time.time()
+                            e['isSent'] = True
 
-                if self.window[0]['isACKed']:
-                    Logger.LogDebug("Moving window")
-                    self.moveSendWindow()
+                    ackReceived = None
 
-            self.stopDownloading()
+                    try:
+                        self.socket.settimeout(0.2)
+                        ackReceived = self.receiveACK()
+                        socketTimeouts = 0
+                    except TimeoutError:                
+                        socketTimeouts += 1
+                        Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+                    except:
+                        Logger.LogError("There has been an error receiving the ACK")
 
-            print('Finalized downloading file')
+                    for e in self.window:
+                        if (not e['isACKed']) and ackReceived == e['nseq']:
+                            e['isACKed'] = True
+                            packetsACKed += 1
+                            Logger.LogDebug(f"ACKed {packetsACKed} packets")  
+                        if (not e['isACKed']) and (time.time() - e['sentAt'] > SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                                self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                                e['sentAt'] = time.time()
+
+                    if self.window[0]['isACKed']:
+                        Logger.LogDebug("Moving window")
+                        self.moveSendWindow()
+
+                self.stopDownloading()
+
+                print('Finalized downloading file')
+            else:
+                Logger.LogError("The transaction could not be completed because the client has not enough space in his disk")               
         
         except FileNotFoundError:
             fileNotExistPacketTimeout = 0
@@ -205,12 +231,18 @@ class ServerSelectiveRepeat:
         Logger.LogDebug("Im waiting for the ack")
         receivedOpcode = self.receiveResponseACK()
 
-        while not nextPacketIsAnOk:
+        receivedErrorCode = False
+
+        while not nextPacketIsAnOk or receivedErrorCode:
             if receivedOpcode == DOWNLOAD_REQUEST_OPCODE: # Client re-sent request
                 self.send(message)
                 receivedOpcode = self.receiveResponseACK()
+            elif receivedOpcode == NO_DISK_SPACE_OPCODE:
+                receivedErrorCode = True
             else:
                 nextPacketIsAnOk = True
+
+        return receivedErrorCode
     
     def receiveResponseACK(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(ACK_SIZE)
@@ -380,12 +412,24 @@ class ServerSelectiveRepeat:
     def sendFileNotExistPacket(self):
         opcode = bytes([FILE_DOES_NOT_EXIST_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
-        nseqToBytes = (1).to_bytes(4, BYTEORDER)
+        nseqToBytes = (0).to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
         
         message = Packet.pack_ack(header)
         Logger.LogInfo(f"Sending file does not exist error.")
+        
+        self.send(message)
+
+    def sendNoDiskSpaceErrorPacket(self):
+        opcode = bytes([NO_DISK_SPACE_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, BYTEORDER)
+        nseqToBytes = (0).to_bytes(4, BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        
+        message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending not enough space error.")
         
         self.send(message)
 
