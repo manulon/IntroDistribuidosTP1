@@ -336,8 +336,6 @@ class ClientSelectiveRepeat:
             firstPacketArrived = False
             packetSentTime = time.time()
 
-            self.sendDownloadRequest(filename)
-
             header = None
             payload = None
 
