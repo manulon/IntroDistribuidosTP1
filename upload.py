@@ -74,6 +74,9 @@ def main(argv):
             file_name = arg
             if file_name:
                 Logger.LogInfo(f"File name {file_name}")
+            if len(file_name) > 20:
+                Logger.LogError(f"File name too long. It should be 20 characters or less")
+                return
 
     if file_name == None or file_name == "" or not file_name:
         Logger.LogError("No file specified")

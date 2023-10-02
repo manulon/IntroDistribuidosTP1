@@ -73,7 +73,7 @@ class Packet:
     def unpack_ack(bytes):
         opcode, checksum, nseq = struct.unpack(HEADER_FORMAT, bytes)
         
-        header = {
+        header = {   
             'opcode': Utils.bytesToInt(opcode),
             'checksum': Utils.bytesToInt(checksum),
             'nseq': Utils.bytesToInt(nseq)
@@ -94,12 +94,28 @@ class Packet:
         return header, payload
     
     @staticmethod
-    def pack_ack(header):
+    def pack_header(header):
         opcode = header[0]
         checksum = header[1]
         nseq = header[2]
         
         return struct.pack(HEADER_FORMAT, opcode, checksum, nseq)
+
+    @staticmethod
+    def pack_ack(header):
+        return Packet.pack_header(header)
+    
+    @staticmethod
+    def pack_file_too_big_error(header):
+        return Packet.pack_header(header)
+
+    @staticmethod
+    def pack_file_already_exists_error(header):
+        return Packet.pack_header(header)
+    
+    @staticmethod
+    def pack_no_disk_space_error(header):
+        return Packet.pack_header(header)
     
     @staticmethod
     def pack_stop_file_transfer(header, payload):

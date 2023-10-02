@@ -2,6 +2,9 @@ from socket import *
 from common.Socket import Socket
 from common.Packet import Packet
 from common.constants import *
+from common.Utils import *
+from server.ServerSelectiveRepeat import ServerSelectiveRepeat
+from server.ServerStopAndWait import ServerStopAndWait
 from common.Logger import *
 from common.Checksum import *
 from server.ServerSelectiveRepeat import *
@@ -9,6 +12,8 @@ from server.UDPConnectionAceptorThread import *
 
 
 class Server():
+    MAX_FILE_SIZE = 4000000000 # 4GB
+
     def __init__(self, address, port, storage):
         self.port = port
         self.address = address

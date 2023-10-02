@@ -1,4 +1,5 @@
 from common.constants import *
+from shutil import disk_usage
 
 class Utils:
     
@@ -19,3 +20,8 @@ class Utils:
         for i in range(n-1):
             bytes_ += digit.to_bytes(1, BYTEORDER)
         return bytes_
+    
+    @staticmethod
+    def getFreeDiskSpace():
+        _, _, free = disk_usage("/")
+        return free

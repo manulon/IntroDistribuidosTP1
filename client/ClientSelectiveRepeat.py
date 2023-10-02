@@ -1,3 +1,5 @@
+from tqdm import tqdm
+import time
 import hashlib
 import math
 import time
@@ -68,34 +70,35 @@ class ClientSelectiveRepeat:
         packetsPushed = 0
         nseq = 1
         payloadWithNseq = {}
-        socketTimeouts = 0
-
+        socketTimeouts = 0        
+        
         while (packetsACKed != totalPackets) and (socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
-            while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
-                payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
-                payloadWithNseq[nseq] = payloadAux
-                self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
-                packetsPushed += 1
-                nseq += 1
-            
-            for e in self.window:
-                if not e['isSent']:
-                    Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
-                    self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
-                    e['sentAt'] = time.time()
-                    e['isSent'] = True
-            
-            ackReceived = None
+            for i in tqdm (range (totalPackets),desc="Uploading...",ascii=False, ncols=75):
+                while ( (len(self.window) != 10) and (packetsPushed != totalPackets)):
+                    payloadAux = file[packetsPushed * CHUNKSIZE : (packetsPushed + 1) * CHUNKSIZE]
+                    payloadWithNseq[nseq] = payloadAux
+                    self.window.append({'nseq': nseq, 'isSent': False, 'isACKed': False, 'sentAt': None})                
+                    packetsPushed += 1
+                    nseq += 1
+                
+                for e in self.window:
+                    if not e['isSent']:
+                        Logger.LogDebug(f"Sending packet with sequence: {e['nseq']}")
+                        self.sendPackage(payloadWithNseq[e['nseq']], e['nseq'])
+                        e['sentAt'] = time.time()
+                        e['isSent'] = True
+                
+                ackReceived = None
 
-            try:
-                self.socket.settimeout(0.2)
-                ackReceived = self.receiveACK()
-                socketTimeouts = 0
-            except TimeoutError:                
-                socketTimeouts += 1
-                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-            except:
-                Logger.LogError("There has been an error receiving the ACK")
+                try:
+                    self.socket.settimeout(0.2)
+                    ackReceived = self.receiveACK()
+                    socketTimeouts = 0
+                except TimeoutError:                
+                    socketTimeouts += 1
+                    Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
+                except:
+                    Logger.LogError("There has been an error receiving the ACK")
 
             for e in self.window:
                 if (not e['isACKed']) and ackReceived == e['nseq']:
@@ -113,14 +116,14 @@ class ClientSelectiveRepeat:
                 Logger.LogDebug("Moving window")
                 self.moveSendWindow()
 
-
+        print("Verifying file...")
         self.stopUploading(int(totalPackets + 1))
 
-        print('File transfer has ended.')
+        print('File transfer has completed.')
         Logger.LogInfo(f"Total packets to send: {totalPackets}, nseq: {nseq}, socket timeouts: {socketTimeouts}")
 
     def sendUploadRequest(self, fileName, fileSize, md5):
-        opcode = bytes([0x0])
+        opcode = bytes([UPLOAD_REQUEST_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendUploadRequest')
@@ -143,7 +146,7 @@ class ClientSelectiveRepeat:
         self.chunksize = payload['chunksize']
         
     def sendPackage(self, payload, nseq):
-        opcode = bytes([0x4])
+        opcode = bytes([PACKET_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (nseq).to_bytes(4, BYTEORDER)
 
@@ -183,7 +186,7 @@ class ClientSelectiveRepeat:
         if payload["state"] == 0:
             Logger.LogError("There's been an error uploading the file in the server. File corrupt in the server")
 
-        opcode = bytes([0x7])
+        opcode = bytes([FINAL_ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (header['nseq']).to_bytes(4, BYTEORDER)
         finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'stopUploading')

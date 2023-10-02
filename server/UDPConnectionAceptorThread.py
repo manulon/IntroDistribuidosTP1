@@ -1,8 +1,11 @@
 import threading
 from common.constants import *
 from common.Socket import *
+from server.ServerStopAndWait import ServerStopAndWait
 from server.UDPServerThread import *
 from server.ServerSelectiveRepeat import *
+from server.ServerStopAndWait import ServerStopAndWait
+
 
 class UDPConnectionAceptorThread(threading.Thread):
 
@@ -29,19 +32,21 @@ class UDPConnectionAceptorThread(threading.Thread):
                                 f"{COLOR_END}"
                                 f" - New UDP Client {clientAddress}"
                                 f":{clientPort} connected.")
+                        
+                        self.lastSocketPort += 1
+                        newSocket = Socket(self.lastSocketPort, self.serverAddress)
+                        
                         match payload['protocol']:
-                            case 0: # STOP & WAIT
-                                print('Seleccionaste stop and wait')
-                            case 1: # SELECTIVE REPEAT    
-                                print('Seleccionaste Selective Repeat')
+                            case 2: # STOP & WAIT
+                                protocol = ServerStopAndWait(newSocket, clientAddress, clientPort, self.storage)
+                                Logger.LogInfo('Selected stop and wait')
 
-                                self.lastSocketPort += 1
-                                newSocket = Socket(self.lastSocketPort, self.serverAddress)
-                                self.clients[(clientAddress, clientPort)] = UDPServerThread(
-                                    ServerSelectiveRepeat(newSocket, clientAddress, clientPort, self.storage),
-                                    header, payload
-                                )
-                                self.clients[(clientAddress, clientPort)].start()
+                            case 1: # SELECTIVE REPEAT
+                                protocol = ServerSelectiveRepeat(newSocket, clientAddress, clientPort, self.storage)
+                                Logger.LogInfo('Selected Selective Repeat')
+
+                        self.clients[(clientAddress, clientPort)] = UDPServerThread(protocol, header, payload)
+                        self.clients[(clientAddress, clientPort)].run()
                 except:
                     continue
 
