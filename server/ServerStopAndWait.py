@@ -20,6 +20,13 @@ class ServerStopAndWait:
         self.socket.send(message, self.clientAddress, self.clientPort)
 
     def sendFileTransferTypeResponse(self, fileSize):
+        if fileSize > const.MAX_FILE_SIZE:
+            self.sendFileTooBigError()
+            return const.FILE_TOO_BIG_OPCODE
+        elif fileSize > Utils.getFreeDiskSpace():
+            self.sendNoDiskSpaceError()
+            return const.NO_DISK_SPACE_OPCODE    
+
         opcode = bytes([const.FILE_TRANSFER_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
@@ -31,10 +38,39 @@ class ServerStopAndWait:
 
         message = Packet.pack_file_transfer_type_response(header, chunksize)
         self.send(message)
+        return const.FILE_TRANSFER_RESPONSE_OPCODE
+    
+
+    def sendFileTooBigError(self):
+        opcode = bytes([const.FILE_TOO_BIG_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseq = (0).to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
+        header = (opcode, finalChecksum, nseq)
+
+        message = Packet.pack_file_too_big_error(header)
+        self.send(message)
+
+    def sendNoDiskSpaceError(self):
+        opcode = bytes([const.NO_DISK_SPACE_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseq = (0).to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
+        header = (opcode, finalChecksum, nseq)
+
+        message = Packet.pack_no_disk_space_error(header)
+        self.send(message)
 
     def upload(self, fileSize, fileName, originalMd5):
         fileName = fileName.rstrip('\x00')
-        self.sendFileTransferTypeResponse(fileSize)
+        opcode = self.sendFileTransferTypeResponse(fileSize)
+        if opcode == const.FILE_TOO_BIG_OPCODE:
+            Logger.LogError("File too big")
+            return
+        elif opcode == const.NO_DISK_SPACE_OPCODE:
+            Logger.LogError("No disk space")
+            return
+        
         totalPackets = fileSize / const.CHUNKSIZE
         acksSent = 0
         nextNseq = 1
@@ -156,7 +192,7 @@ class ServerStopAndWait:
 
         Logger.LogDebug(f"Im sending a packet with opcode: {Utils.bytesToInt(opcode)} and nseq: {Utils.bytesToInt(nseq)}")
         Logger.LogDebug("Im waiting for the ack")
-        
+
         nextPacketIsAnOk = False
         ackReceived = False
         socketTimeouts = 0

@@ -12,8 +12,6 @@ from server.UDPConnectionAceptorThread import *
 
 
 class Server():
-    MAX_FILE_SIZE = 4000000000 # 4GB
-
     def __init__(self, address, port, storage):
         self.port = port
         self.address = address

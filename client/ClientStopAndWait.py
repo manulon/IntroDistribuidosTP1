@@ -106,9 +106,6 @@ class ClientStopAndWait:
                     'Not enough disk space in server to upload file')
             elif opcode == const.FILE_TOO_BIG_OPCODE:
                 Logger.LogError('File too big, not supported by protocol')
-            elif opcode == const.FILE_ALREADY_EXISTS_OPCODE:
-                Logger.LogError(
-                    'The file that you are trying to upload already exists in the server')
             else:
                 Logger.LogError('Uknown error, retry')
             return const.ERROR_CODE
