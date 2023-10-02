@@ -207,24 +207,44 @@ class ClientStopAndWait:
 
         print('Finalized uploading file.')
 
-    def download(self, filename):
-        Logger.LogInfo (f"About to start downloading: {filename}")
-        self.sendDownloadRequest(filename)
-        filesize, md5 = self.receiveDownloadResponse()
-        if filesize >= u.getFreeDiskSpace():
-            Logger.LogError(f"Not enough space for download {filesize/1000}kB are needed")
+    def download(self, fileName):
+        Logger.LogInfo (f"About to start downloading: {fileName}")
+        self.sendDownloadRequest(fileName)
+        fileSize, md5 = self.receiveDownloadResponse()
+
+        if fileSize >= u.getFreeDiskSpace():
+            Logger.LogError(f"Not enough space for download {fileSize/1000}kB are needed")
             return
-        
-        totalPackets = filesize / const.CHUNKSIZE
+        file = []
+        totalPackets = fileSize / const.CHUNKSIZE
         acksSent = 0
         # enviar ok al servidor para que arranque la descarga
         while acksSent < totalPackets:
-            #recibir paquete
-            #verificar checksum y nseq
-            #mandarAcks del pack
-            #appendear bytes
-            acksSent += 1
+            header, payload = self.receivePackage()
+            if header['nseq'] == nextNseq:
+                # package = Packet.pack_package(header, payload)
+                # if self.isChecksumOK(header, payload):
+                self.sendACK(header['nseq'])
+                Logger.LogDebug(f"Sent ACK {header['nseq']}")
+                file.append(payload)
+                nextNseq = acksSent % 2
+                acksSent += 1
+                #else:
+                    #Logger.LogError('Checksum error') # client resends packet (corrupted packet)
+            else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
+                self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
+                Logger.LogDebug(f"RE-Sent ACK {header['nseq']}")
 
+        bytesInLatestPacket = fileSize % const.CHUNKSIZE
+        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
+        file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
+        Logger.LogWarning("Padding removed")
+
+        self.saveFile(file, fileName)
+        newMd5, state = self.checkFileMD5(fileName, md5)
+        self.stopFileTransfer(nextNseq, fileName, newMd5, state)
+
+    print('File transfer has ended.')
     def sendDownloadRequest(self, fileName):
             opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
             zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
@@ -247,4 +267,14 @@ class ClientStopAndWait:
         self.serverPort = udpServerThreadPort
         _, payload = Packet.unpack_download_response(received_message)
         return payload['filesize'], payload['md5']
-        
+    
+
+    def sendConnectionACK(self):
+        opcode = bytes([0x3])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = (0).to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        message = Packet.pack_ack(header)
+        Logger.LogInfo(f"Sending Connection ACK")
+        self.send(message)
