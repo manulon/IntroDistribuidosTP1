@@ -82,7 +82,7 @@ def main(argv):
         Logger.LogError("No file specified")
         return
 
-    client = Client(host_service_ip_address, port_service_port)
+    client = Client(host_service_ip_address, port_service_port, storage)
 
     has_protocol = False
     while (has_protocol == False):
@@ -98,7 +98,6 @@ def main(argv):
             print('Invalid option. \n')
 
     client.upload(file_name)
-
     client.close()
 
 if __name__ == '__main__':

@@ -14,13 +14,15 @@ class UDPServerThread(threading.Thread):
         while self.allowedToRun:
             match self.firstPacketHeader['opcode']:
                 case 0: # Upload
+                    Logger.LogDebug("Im going to start an upload")
                     self.protocol.upload(self.firstPacketPayload['fileSize'], 
                                          self.firstPacketPayload['fileName'], 
                                          self.firstPacketPayload['md5'])
                     self.force_stop()
                 case 2: # Download
-                    #print('downloading (stop and wait): '+ str(message))
-                    #StopAndWait.download()
+                    Logger.LogDebug("Im going to start a download")
+                    self.protocol.download(self.firstPacketPayload['fileName'])
+                    self.force_stop()
                     continue
                 case 7: # List
                     #StopAndWait.list(message)

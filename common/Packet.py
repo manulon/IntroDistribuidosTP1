@@ -143,7 +143,6 @@ class Packet:
 
         return header, payload
     
-        
     @staticmethod
     def pack_download_request(header, payload):
         opcode = header[0]

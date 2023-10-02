@@ -11,7 +11,7 @@ def main(argv):
     Logger.SetLogLevel(LOG_LEVEL_WARNING)
     host_service_ip_address = "localhost"  # por defecto localhost
     port_service_port = 15000  # por defecto 15000
-    storage = ""
+    storage = "./client_files"
     file_name = None
     
     try:
@@ -44,7 +44,7 @@ def main(argv):
             Logger.SetLogLevel(LOG_LEVEL_DEBUG)
             Logger.LogInfo("Verbosity will now be set to Debug")
         
-         # QUIET
+        # QUIET
         elif opt in ("-q", "--quiet"):
             Logger.LogInfo("Verbosity will now be set to Error")
             Logger.SetLogLevel(LOG_LEVEL_ERROR)           
@@ -54,7 +54,7 @@ def main(argv):
             host_service_ip_address = arg
             Logger.LogInfo(f"Host set to {host_service_ip_address}")
 
-       # PORT
+        # PORT
         elif opt in ("-p", "--port"):
             port_service_port = int(arg)
             Logger.LogInfo(f"Port set to {port_service_port}")
@@ -79,7 +79,7 @@ def main(argv):
         Logger.LogError("No file specified")
         return
 
-    client = Client(host_service_ip_address, port_service_port)
+    client = Client(host_service_ip_address, port_service_port, storage)
 
     has_protocol = False
     while (has_protocol == False):
@@ -95,7 +95,6 @@ def main(argv):
             print('Invalid option. \n')
 
     client.download(file_name)
-
     client.close()
 
 if __name__ == '__main__':
