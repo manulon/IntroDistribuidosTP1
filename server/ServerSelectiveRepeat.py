@@ -50,7 +50,6 @@ class ServerSelectiveRepeat:
         return receivedPacketHeader, receivedPacketPayload
             
     def upload(self, filesize, fileName, originalMd5):
-        filesize = 4902384039840983409234665468245454645432465432146545453165156123165464543213545168151351654
         if filesize >= Utils.getFreeDiskSpace():           
             noDiskSpacePacketTimeout = 0
             noDiskSpacePacketACKed = False
