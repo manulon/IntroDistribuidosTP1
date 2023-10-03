@@ -1,6 +1,6 @@
 import sys
 
-TIMEOUT = 0.2
+TIMEOUT = 0.1
 '''Colores para prints'''
 COLOR_GREEN = '\033[92m'
 COLOR_BLUE = '\033[94m'
