@@ -344,7 +344,7 @@ class ClientSelectiveRepeat:
                     sendConnectionACKSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
                     self.socket.settimeout(TIMEOUT)
-                    header, header = self.receivePacket()
+                    header, payload = self.receivePacket()
                     sendConnectionACKSocketTimeout = 0
                     firstPacketArrived = True
                 except TimeoutError:
