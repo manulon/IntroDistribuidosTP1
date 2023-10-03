@@ -211,14 +211,18 @@ class ServerStopAndWait:
 
         socketTimeouts = 0
         ackNseq = -1
+        lastNseqSent = -1
         while (packetsPushed < totalPackets and socketTimeouts <
                const.CLIENT_SOCKET_TIMEOUTS):
             sequenceNumber = (packetsPushed + 1) % 2  # starts in 1
             payload = file[packetsPushed *
                            chunksize: (packetsPushed + 1) * chunksize]
-            self.sendPacket(sequenceNumber, payload)
-            Logger.LogDebug(f"Sending packet with nseq: {sequenceNumber}")
-            packetSentTime = time.time()
+                           
+            if lastNseqSent != sequenceNumber:
+                self.sendPacket(sequenceNumber, payload)
+                lastNseqSent = sequenceNumber
+                Logger.LogDebug(f"Sending packet with nseq: {sequenceNumber}")
+                packetSentTime = time.time()
             try:
                 self.socket.settimeout(const.TIMEOUT)
                 ackNseq = self.receiveACK()
