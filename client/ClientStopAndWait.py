@@ -127,16 +127,6 @@ class ClientStopAndWait:
             # self.sendACK(0)
             return const.ERROR_CODE
 
-        '''
-        header, payload = \
-            Packet.unpack_file_transfer_type_response\
-                (received_message)
-        print('----------')
-        print('Recibi este header:', header)
-        print('El tamaño del chunk es:', payload)
-        print('¡Adios!')
-        '''
-
     def sendFile(self, file, chunksize):
         fileSize = len(file)
         totalPackets = fileSize / chunksize
