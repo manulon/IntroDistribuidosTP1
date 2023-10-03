@@ -362,10 +362,8 @@ class ClientSelectiveRepeat:
             file = {}
             totalPackets = math.ceil(filesize / CHUNKSIZE)
             distinctAcksSent = 0
-            firstIteration = True
-
-            for i in range(1, 10):
-                self.window.append({'nseq': i, 'isACKSent': False})
+            firstIteration = True           
+            acksSent = {}
 
             while distinctAcksSent != totalPackets:
                 if not firstIteration:
@@ -373,20 +371,14 @@ class ClientSelectiveRepeat:
                 else:
                     firstIteration = False
 
-                if header is not None and self.isChecksumOK(header, payload):
+                if self.isChecksumOK(header, payload):
                     self.sendACK(header['nseq'])
+                    acksSent[header['nseq']] = True
+                    file[header['nseq'] - 1] = payload
 
-                for e in self.window:
-                    if header is not None and (
-                            not e['isACKSent']) and \
-                                header['nseq'] == e['nseq']:
-                        e['isACKSent'] = True
-                        distinctAcksSent += 1
-                        file[header['nseq'] - 1] = payload
+                distinctAcksSent = len(acksSent)
 
-                if header is not None and header['nseq'] \
-                        == self.window[0]['nseq']:
-                    self.moveReceiveWindow()
+                print(f"{distinctAcksSent} vs {totalPackets}")
 
             bytesInLatestPacket = filesize % CHUNKSIZE
             Logger.LogWarning(

@@ -104,8 +104,6 @@ class ServerSelectiveRepeat:
             firstIteration = True
             acksSent = {}
             Logger.LogInfo(f"Total packets to send: {totalPackets}")
-            # for i in range(1, 10):
-            #    self.window.append({'nseq': i, 'isACKSent': False})
 
             while distinctAcksSent != totalPackets:
                 if not firstIteration:
@@ -117,15 +115,9 @@ class ServerSelectiveRepeat:
                     acksSent[header['nseq']] = True
                     file[header['nseq'] - 1] = payload
 
-                #for e in self.window:
-                #    if (not e['isACKSent']) and header['nseq'] == e['nseq']:
-                #        e['isACKSent'] = True
-                #        distinctAcksSent += 1
                 distinctAcksSent = len(acksSent)
 
-                #self.moveReceiveWindow()
                 print(f"{distinctAcksSent} vs {totalPackets}")
-                #print(f"ventana {self.window}")
 
 
             bytesInLatestPacket = filesize % CHUNKSIZE
