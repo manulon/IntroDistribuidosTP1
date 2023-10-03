@@ -11,7 +11,8 @@ from common.constants import SELECTIVE_REPEAT, \
     NO_DISK_SPACE_OPCODE, ACK_SIZE, PACKET_SIZE, ACK_OPCODE, \
     STOP_FILE_TRANSFER_OPCODE, STATE_OK, STATE_ERROR, \
     FILE_DOES_NOT_EXIST_OPCODE, LAST_ACK_PACKET_TIMEOUT, \
-    STOP_FILE_TRANSFER_SIZE, TIMEOUT, FINAL_ACK_OPCODE
+    STOP_FILE_TRANSFER_SIZE, TIMEOUT, FINAL_ACK_OPCODE, \
+    SELECTIVE_REPEAT_PACKET_TIMEOUT
 from common.Logger import Logger
 from common.Checksum import Checksum
 
@@ -202,8 +203,8 @@ class ServerSelectiveRepeat:
                             packetsACKed += 1
                             Logger.LogDebug(f"ACKed {packetsACKed} packets")
                         if (not e['isACKed']) and (time.time() -
-                                                   e['sentAt'] >
-                                                   SELECTIVE_REPEAT_PKT_TOUT):
+                                e['sentAt'] >
+                                SELECTIVE_REPEAT_PACKET_TIMEOUT):
                             Logger.LogWarning(
                                 f"There has been a timeout in Sending \
                                 the packet with nseq {e['nseq']}. Retransmiting packet")
