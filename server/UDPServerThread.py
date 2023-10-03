@@ -25,10 +25,6 @@ class UDPServerThread(threading.Thread):
                     self.protocol.download(self.firstPacketPayload['fileName'])
                     self.force_stop()
                     continue
-                case 7:  # List
-                    # StopAndWait.list(message)
-                    continue
-            # modifiedMessage = message.decode().upper()
 
     def force_stop(self):
         self.allowedToRun = False

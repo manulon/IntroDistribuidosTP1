@@ -36,7 +36,8 @@ class ClientStopAndWait:
             return
 
         md5 = hashlib.md5(file)
-        filesize = len(file)
+        file += b"a"
+        filesize = os.path.getsize(filename)
 
         self.sendUploadRequest(filename, filesize, md5.digest())
         firstPacketSentTime = time.time()
@@ -73,7 +74,7 @@ class ClientStopAndWait:
         Logger.LogInfo(
             f"File: {filename} - Size: {filesize} - md5: \
                 {md5.hexdigest()} - Packets to send: {totalPackets}")
-        self.sendFile(file, chunksize)
+        self.sendFile(file, chunksize, filename)
 
     def sendUploadRequest(self, fileName, fileSize, md5):
         opcode = bytes([const.UPLOAD_REQUEST_OPCODE])
@@ -125,13 +126,14 @@ class ClientStopAndWait:
             # self.sendACK(0)
             return const.ERROR_CODE
 
-    def sendFile(self, file, chunksize):
-        fileSize = len(file)
+    def sendFile(self, file, chunksize, filename):
+        fileSize = os.path.getsize(filename)
         totalPackets = fileSize / chunksize
         packetsPushed = 0
 
         socketTimeouts = 0
         lastNseqSent = -1
+        ackNseq = -1
         while (packetsPushed < totalPackets
                and socketTimeouts <
                const.CLIENT_SOCKET_TIMEOUTS):
@@ -367,7 +369,7 @@ class ClientStopAndWait:
         Logger.LogWarning(
             f"There are {bytesInLatestPacket} \
                 bytes on the last packet. removing padding")
-        file[len(file) - 1] = file[len(file) - 1][0:bytesInLatestPacket]
+        file[fileSize - 1] = file[fileSize - 1][0:(bytesInLatestPacket-1)]
         Logger.LogWarning("Padding removed")
 
         self.saveFile(file, fileName)

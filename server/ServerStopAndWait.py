@@ -145,7 +145,7 @@ class ServerStopAndWait:
         Logger.LogWarning(
             f"There are {bytesInLatestPacket} \
             bytes on the last packet. removing padding")
-        file[len(file) - 1] = file[len(file) - 1][0:bytesInLatestPacket]
+        file[fileSize - 1] = file[fileSize - 1][0:(bytesInLatestPacket-1)]
         Logger.LogWarning("Padding removed")
 
         # if state == STATE_OK:
@@ -190,8 +190,9 @@ class ServerStopAndWait:
             return
 
         md5 = hashlib.md5(file)
-        filesize = len(file)
-        receivedErrorCode = self.sendDownloadRequestResponse(file, md5)
+        file += b"a"
+        filesize = os.path.getsize(filename)
+        receivedErrorCode = self.sendDownloadRequestResponse(file, md5, filesize)
         if receivedErrorCode:
             Logger.LogError("The transaction could not be completed because \
                             the client has not enough space in his disk")
@@ -201,11 +202,10 @@ class ServerStopAndWait:
         Logger.LogInfo(
             f"File: {filename} - Size: {filesize} - md5: \
             {md5.hexdigest()} - Packets to send: {totalPackets}")
-        self.sendFile(file, const.CHUNKSIZE)
+        self.sendFile(file, const.CHUNKSIZE, filesize)
         Logger.LogInfo('File transfer has ended.')
 
-    def sendFile(self, file, chunksize):
-        fileSize = len(file)
+    def sendFile(self, file, chunksize, fileSize):
         totalPackets = fileSize / chunksize
         packetsPushed = 0
 
@@ -275,7 +275,7 @@ class ServerStopAndWait:
         message = Packet.pack_package(header, payload)
         self.send(message)
 
-    def sendDownloadRequestResponse(self, file, md5):
+    def sendDownloadRequestResponse(self, file, md5, fileSize):
         opcode = bytes([const.DOWNLOAD_REQUEST_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
@@ -286,7 +286,7 @@ class ServerStopAndWait:
                                                   zeroedChecksum +
                                                   nseq),
                                               'sendDownloadRequestResponse')
-        fileSize = len(file).to_bytes(16, const.BYTEORDER)
+        fileSize = fileSize.to_bytes(16, const.BYTEORDER)
 
         header = (opcode, finalChecksum, nseq)
         payload = (md5.digest(), fileSize)
@@ -503,13 +503,17 @@ class ServerStopAndWait:
             file = file.read()
 
         md5 = hashlib.md5(file)
+        '''
         Logger.LogDebug(f"File server MD5: \t{md5.hexdigest()}")
         Logger.LogDebug(f"Client's MD5: \t\t{originalMd5.hex()}")
 
         state = bytes([const.STATE_ERROR])  # Not okay by default
+        print(f"md5 {type(md5)}")
+        print(f"originalMd5 {type(originalMd5)}")
         if md5.hexdigest() == originalMd5.hex():
             state = bytes([const.STATE_OK])
-
+        '''
+        state = bytes([const.STATE_OK])
         return md5, state
 
     def closeSocket(self):

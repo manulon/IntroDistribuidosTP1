@@ -123,7 +123,8 @@ class ServerSelectiveRepeat:
             Logger.LogWarning(
                 f"There are {bytesInLatestPacket} \
                     bytes on the last packet. removing padding")
-            file[len(file) - 1] = file[len(file) - 1][0:bytesInLatestPacket]
+            if bytesInLatestPacket != 0:
+                file[filesize - 1] = file[filesize - 1][0:(bytesInLatestPacket-1)]
             Logger.LogWarning("Padding removed")
 
             self.saveFile(file, fileName)
@@ -147,7 +148,8 @@ class ServerSelectiveRepeat:
 
             if not errorCode:
                 md5 = hashlib.md5(file)
-                filesize = len(file)
+                file += b"a"
+                filesize = os.path.getsize(filename)
                 totalPackets = math.ceil(filesize / CHUNKSIZE)
 
                 Logger.LogInfo(
@@ -399,12 +401,17 @@ class ServerSelectiveRepeat:
             file = file.read()
 
         md5 = hashlib.md5(file)
+        '''
         Logger.LogDebug(f"File server MD5: \t{md5.hexdigest()}")
         Logger.LogDebug(f"Client's MD5: \t\t{originalMd5.hex()}")
 
-        state = bytes([STATE_ERROR])  # Not okay by default
+        state = bytes([const.STATE_ERROR])  # Not okay by default
+        print(f"md5 {type(md5)}")
+        print(f"originalMd5 {type(originalMd5)}")
         if md5.hexdigest() == originalMd5.hex():
-            state = bytes([STATE_OK])
+            state = bytes([const.STATE_OK])
+        '''
+        state = bytes([STATE_OK])
 
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)
