@@ -257,45 +257,6 @@ class ClientStopAndWait:
                 initCommunicationSocketTimeout = 0
                 communicationStarted = True
                 if fileSize >= Utils.getFreeDiskSpace():
-<<<<<<< Updated upstream
-                    Logger.LogError(f"Not enough space for download. \
-                                    {fileSize/1000}kB are needed")
-                    self.sendNoDiskSpaceError()
-                    errorSentTime = time.time()
-                    errorTimeouts = 0
-                    Logger.LogDebug("Sent error")
-                    receivedErrorACK = False
-                    while (errorTimeouts < const.LAST_ACK_PACKET_TIMEOUT
-                           and not receivedErrorACK):
-                        try:
-                            self.socket.settimeout(const.TIMEOUT)
-                            ackNseq = self.receiveACK()
-                            Logger.LogDebug(f"Received ACK {ackNseq}")
-                            errorTimeouts = 0
-                            receivedErrorACK = True
-                        except TimeoutError:
-                            Logger.LogWarning(f"There has been a timeout on \
-                                            the servers ACK for an error \
-                                            (timeout number: {errorTimeouts})")
-                            errorTimeouts += 1
-
-                        if (not communicationStarted) and (
-                            time.time() - errorSentTime >
-                            const.SELECTIVE_REPEAT_PACKET_TIMEOUT
-                        ):
-                            self.sendNoDiskSpaceError()
-                            errorSentTime = time.time()
-                    return
-                if opcode == const.FILE_DOES_NOT_EXIST_OPCODE:
-                    Logger.LogError(f"File {fileName} does not \
-                                    exist in the server")
-                    self.sendACK(0)
-                    return
-                if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
-                    Logger.LogError(f"{opcode}")
-                    Logger.LogError("Unknown error")
-                    return
-=======
                     errorCode = True
                 else:
                     if opcode == const.FILE_DOES_NOT_EXIST_OPCODE:
@@ -306,14 +267,12 @@ class ClientStopAndWait:
                     if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
                         Logger.LogError("Unknown error")
                         return
->>>>>>> Stashed changes
             except TimeoutError:
                 initCommunicationSocketTimeout += 1
                 Logger.LogWarning(
                     f"There has been a timeout \
                         (timeout number: {initCommunicationSocketTimeout})")
 
-<<<<<<< Updated upstream
             if (not communicationStarted) and (time.time() -
                                                firstPacketSentTime >
                                                const.
@@ -322,15 +281,6 @@ class ClientStopAndWait:
                 Logger.LogInfo("Retransmiting packet sendDownloadRequest")
                 self.sendDownloadRequest(fileName)
                 firstPacketSentTime = time.time()
-=======
-                if (not communicationStarted) and (time.time() -
-                                                firstPacketSentTime >
-                                                const.
-                                                SELECTIVE_REPEAT_PACKET_TIMEOUT
-                                                ):
-                    self.sendDownloadRequest(fileName)
-                    firstPacketSentTime = time.time()
->>>>>>> Stashed changes
 
         Logger.LogDebug(
             f"You are about to download a file of \
@@ -460,35 +410,9 @@ class ClientStopAndWait:
         self.send(message)
 
     def receiveDownloadResponse(self):
-<<<<<<< Updated upstream
-        socketTimeouts = 0
-        receivedResponse = False
-        received_message = None
-        while socketTimeouts < \
-                const.CLIENT_SOCKET_TIMEOUTS \
-                and not receivedResponse:
-            try:
-                self.socket.settimeout(const.TIMEOUT)
-                received_message, \
-                    (udpServerThreadAddress,
-                     udpServerThreadPort)\
-                    = self.socket.receive(const.
-                                          DOWNLOAD_RESPONSE_SIZE)
-                receivedResponse = True
-                self.serverAddress = udpServerThreadAddress
-                self.serverPort = udpServerThreadPort
-            except TimeoutError:
-                socketTimeouts += 1
-                Logger.LogWarning("There has been a timeout")
-            except BaseException:
-                Logger.LogError(
-                    "There has been an error receiving the download response")
-                return const.ERROR_CODE, 0, 0
-=======
         received_message, (udpServerThreadAddress,
                            udpServerThreadPort) = self.socket.receive(
             const.DOWNLOAD_RESPONSE_SIZE)
->>>>>>> Stashed changes
 
         self.serverAddress = udpServerThreadAddress
         self.serverPort = udpServerThreadPort
