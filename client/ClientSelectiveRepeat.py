@@ -73,19 +73,18 @@ class ClientSelectiveRepeat:
                     communicationStarted = True
                 except TimeoutError:
                     initCommunicationSocketTimeout += 1
-                    Logger.LogWarning(
-                        f"There has been a timeout (timeout number: \
-                            {initCommunicationSocketTimeout})")
 
                 if (not communicationStarted) and \
                         (time.time() -
                             firstPacketSentTime >
                             SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                    Logger.LogWarning(
+                        f"There has been a timeout in Sending \
+                        upload request. Retransmiting packet")
                     self.sendUploadRequest(filename, filesize, md5.digest())
                     firstPacketSentTime = time.time()
 
             if not errorCode:
-                Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
                 packetsACKed = 0
                 packetsPushed = 0
                 nseq = 1
@@ -95,11 +94,6 @@ class ClientSelectiveRepeat:
                 while (
                         packetsACKed != totalPackets) and (
                         socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
-                    '''for i in tqdm(
-                            range(totalPackets),
-                            desc="Uploading...",
-                            ascii=False,
-                            ncols=75):'''
                     while ((len(self.window) != 10) and (
                             packetsPushed != totalPackets)):
                         payloadAux = file[packetsPushed * CHUNKSIZE:
@@ -126,12 +120,10 @@ class ClientSelectiveRepeat:
                     try:
                         self.socket.settimeout(TIMEOUT)
                         ackReceived = self.receiveACK()
+                        Logger.LogDebug(f"Received ACK with nseq: {ackReceived}")
                         socketTimeouts = 0
                     except TimeoutError:
                         socketTimeouts += 1
-                        Logger.LogWarning(
-                            f"There has been a socket timeout (number: \
-                                {socketTimeouts})")
                     except BaseException:
                         Logger.LogError(
                             "There has been an error receiving the ACK")
@@ -141,24 +133,24 @@ class ClientSelectiveRepeat:
                         if (not e['isACKed']) and ackReceived == e['nseq']:
                             e['isACKed'] = True
                             packetsACKed += 1
-                            Logger.LogDebug(
-                                f"ACKed {packetsACKed} packets")
                         if (not e['isACKed']) and (
                                 time.time() - e['sentAt'] >
                                 SELECTIVE_REPEAT_PACKET_TIMEOUT):
-
+                            Logger.LogWarning(
+                                f"There has been a timeout in Seending \
+                                packet with nseq: {e['nseq']}. \
+                                Retransmiting packet")
                             self.sendPackage(
                                 payloadWithNseq[e['nseq']], e['nseq'])
                             e['sentAt'] = time.time()
 
                     if self.window[0]['isACKed']:
-                        Logger.LogDebug("Moving window")
                         self.moveSendWindow()
 
-                print("Verifying file...")
+                Logger.LogDebug("Verifying file...")
                 self.stopUploading(int(totalPackets + 1))
 
-                print('File transfer has completed.')
+                Logger.LogSuccess("Finalizing uploading file")
 
             else:
                 Logger.LogError("The transaction could not be completed \
@@ -213,16 +205,13 @@ class ClientSelectiveRepeat:
 
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_package(header, payload)
-        Logger.LogInfo(f"About to send packet nseq: {nseq}")
         self.send(message)
 
     def receiveACK(self):
         received_message, (serverAddres,
                            serverPort) = self.socket.receive(ACK_SIZE)
-        Logger.LogDebug(f"RECEIVED MESSAGE {received_message}")
 
         header = Packet.unpack_ack(received_message)
-        Logger.LogInfo(f"RECEIVED ACK. \t{header}")
         opcode = header['opcode'].to_bytes(1, BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
@@ -241,10 +230,8 @@ class ClientSelectiveRepeat:
 
     def stopUploading(self, nseq):
         self.socket.settimeout(None)
-        Logger.LogDebug("Waiting for stop file transfer message")
         received_message, (serverAddres, serverPort) = self.socket.receive(
             STOP_FILE_TRANSFER_SIZE)
-        Logger.LogDebug("RECEIVED STOP FILE TRANSFER MESSAGE")
         header, payload = Packet.unpack_stop_file_transfer(received_message)
 
         if payload["state"] == 0:
@@ -262,8 +249,6 @@ class ClientSelectiveRepeat:
 
         message = Packet.pack_ack(header)
         self.send(message)
-
-        print('Finalized uploading file')
 
     def sendLastPackage(self, payload, nseq):
         opcode = bytes([0x4])
@@ -302,14 +287,14 @@ class ClientSelectiveRepeat:
                 communicationStarted = True
             except TimeoutError:
                 initCommunicationSocketTimeout += 1
-                Logger.LogWarning(
-                    f"There has been a timeout (timeout number: \
-                        {initCommunicationSocketTimeout})")
 
             if (not communicationStarted) and (time.time() -
                                                firstPacketSentTime >
                                                SELECTIVE_REPEAT_PACKET_TIMEOUT
                                                ):
+                Logger.LogWarning(
+                    f"There has been a timeout in Sending \
+                    download request. Retransmiting packet")
                 self.sendDownloadRequest(filename)
                 firstPacketSentTime = time.time()
 
@@ -378,12 +363,9 @@ class ClientSelectiveRepeat:
 
                 distinctAcksSent = len(acksSent)
 
-                print(f"{distinctAcksSent} vs {totalPackets}")
-
             bytesInLatestPacket = filesize % CHUNKSIZE
             Logger.LogWarning(
-                "There are {bytesInLatestPacket} \
-                   bytes on the las packet. removing padding")
+                f"There are {bytesInLatestPacket} bytes on the las packet. removing padding")
             file[len(file) - 1] = \
                 file[len(file) - 1][0:bytesInLatestPacket]
             Logger.LogWarning("Padding removed")
@@ -391,7 +373,7 @@ class ClientSelectiveRepeat:
 
             self.stopFileTransfer(totalPackets + 1, fileNameModified, md5)
 
-            print('File transfer has ended.')
+            Logger.LogSuccess("Finalizing downloading file")
 
         else:
             Logger.LogError(
@@ -437,6 +419,9 @@ class ClientSelectiveRepeat:
             header, payload = Packet.unpack_upload_request(received_message)
         else:
             header, payload = Packet.unpack_package(received_message)
+            Logger.LogInfo(f"Received packet with \
+                           nseq: {header['nseq']}")
+
 
         return header, payload
 
@@ -463,8 +448,11 @@ class ClientSelectiveRepeat:
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
+        
         message = Packet.pack_ack(header)
-        Logger.LogInfo(f"Sending ACK {nseq} ")
+        
+        Logger.LogInfo(f"Sending ACK wit nseq: {nseq} ")
+        
         self.send(message)
 
     def sendConnectionACK(self):

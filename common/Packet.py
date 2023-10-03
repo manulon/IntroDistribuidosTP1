@@ -94,15 +94,7 @@ class Packet:
                                PACKAGE_FORMAT, opcode,
                                checksum, nseq,
                                payload))
-
-        Logger.LogDebug(
-            f"In packet, I'm about to send packet "
-            f"with size: "
-            f"{size}"
-            f"and nseq:"
-            f"{nseq}"
-            )
-
+        
         return struct.pack(
             HEADER_FORMAT +
             PACKAGE_FORMAT,
@@ -217,7 +209,6 @@ class Packet:
 
     @staticmethod
     def unpack_download_response(bytes):
-        print(HEADER_FORMAT + DOWNLOAD_REQUEST_FORMAT)
         opcode, checksum, nseq, fileSize, md5 = struct.unpack(
             HEADER_FORMAT + DOWNLOAD_RESPONSE_FORMAT, bytes)
 

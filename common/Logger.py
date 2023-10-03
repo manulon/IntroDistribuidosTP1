@@ -1,7 +1,7 @@
 from common.constants import LOG_LEVEL_INFO, \
     LOG_LEVEL_DEBUG, COLOR_PURPLE, COLOR_END, \
     COLOR_RED, LOG_LEVEL_ERROR, COLOR_BLUE, \
-    LOG_LEVEL_WARNING, COLOR_YELLOW
+    LOG_LEVEL_WARNING, COLOR_YELLOW, COLOR_GREEN
 
 
 class Logger:
@@ -36,3 +36,9 @@ class Logger:
         if logLevel >= LOG_LEVEL_INFO:
             print(f"{COLOR_BLUE}[INFO] \
                   {COLOR_END} {message}")
+    
+    @staticmethod
+    def LogSuccess(message):
+        if logLevel >= LOG_LEVEL_WARNING:
+            print(f"{COLOR_GREEN}[INFO] \
+                  {COLOR_GREEN} {message}")

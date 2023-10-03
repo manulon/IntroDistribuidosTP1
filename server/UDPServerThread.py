@@ -28,7 +28,6 @@ class UDPServerThread(threading.Thread):
                 case 7:  # List
                     # StopAndWait.list(message)
                     continue
-
             # modifiedMessage = message.decode().upper()
 
     def force_stop(self):

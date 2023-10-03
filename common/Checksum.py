@@ -37,8 +37,6 @@ class Checksum:
         result = (~cksum) & 0xFFFFFFFF
         resultAsBytes = result.to_bytes(4, BYTEORDER)
 
-        Logger.LogDebug(f"Checksum: {result} \t{message}")
-
         if BYTEORDER == 'little':  # reverse them if little endian
             resultAsBytes = resultAsBytes[::-1]
 
