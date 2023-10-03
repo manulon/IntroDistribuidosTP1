@@ -150,7 +150,7 @@ class ServerStopAndWait:
             errorReceived = False
             self.sendFileDoesNotExistError()
             errorPacketSentTime = time.time()
-            while socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS and not errorReceived:
+            while socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not errorReceived:
                 try:
                     self.socket.settimeout(0.2)
                     ackNseq = self.receiveACK()
@@ -158,7 +158,7 @@ class ServerStopAndWait:
                     socketTimeouts = 0
                     errorReceived = True
                 except TimeoutError:
-                    Logger.LogError("TimeoutError")
+                    Logger.LogWarning("There has been an ACK timeout for an error")
                     socketTimeouts += 1
                 if (not errorReceived) and (time.time() - errorPacketSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
                     self.sendFileDoesNotExistError()
@@ -167,10 +167,12 @@ class ServerStopAndWait:
 
         md5 = hashlib.md5(file)
         filesize = len(file)
-        self.sendDownloadRequestResponse(file, md5)
-       
+        receivedErrorCode = self.sendDownloadRequestResponse(file, md5)
+        if receivedErrorCode:
+            Logger.LogError("The transaction could not be completed because the client has not enough space in his disk")
+            self.sendACK(0)
+            return
         totalPackets = math.ceil(filesize / const.CHUNKSIZE)
-        
         Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
         self.sendFile(file, const.CHUNKSIZE)
         Logger.LogInfo('File transfer has ended.')
@@ -245,13 +247,16 @@ class ServerStopAndWait:
         nextPacketIsAnOk = False
         ackReceived = False
         socketTimeouts = 0
-        while(not ackReceived and socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not nextPacketIsAnOk): # case 4
+        receivedErrorCode = False
+        while(not ackReceived and socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not (nextPacketIsAnOk or receivedErrorCode)): # case 4
             self.send(message)
             try: 
                 self.socket.settimeout(0.2)
                 receivedOpcode = self.receiveResponseACK()
                 Logger.LogDebug(f"Received Download Response ACK. Opcode: {receivedOpcode}")
                 socketTimeouts = 0
+                if receivedOpcode == const.NO_DISK_SPACE_OPCODE:
+                    receivedErrorCode = True
                 if receivedOpcode != const.DOWNLOAD_REQUEST_OPCODE: # If Client re-sent request (not nextPacketIsAnOk), send message again
                     nextPacketIsAnOk = True
             except TimeoutError:                
@@ -259,6 +264,8 @@ class ServerStopAndWait:
                 Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
             except:
                 Logger.LogError("There has been an error receiving the ACK")
+
+        return receivedErrorCode
 
     def receivePacket(self):
         received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
@@ -301,6 +308,10 @@ class ServerStopAndWait:
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
         
+        if header['opcode'] == const.FILE_TOO_BIG_OPCODE:
+            Logger.LogError("File too big")
+            return const.ERROR_CODE
+
         if Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes)):
             return header['nseq']
         else:
@@ -383,6 +394,12 @@ class ServerStopAndWait:
 
         message = Packet.pack_file_does_not_exist_error(header)
         self.send(message)
+
+    def receiveFileTooBigError(self):
+        received_message, (serverAddres, serverPort) = self.socket.receive(const.STOP_FILE_TRANSFER_SIZE)
+        opcode = received_message[:1]
+        Logger.LogDebug(f"Received Error: {opcode}")
+        return const.ERROR_CODE
 
     def checkFileMD5(self, fileName, originalMd5):
         file: bytes
