@@ -39,7 +39,7 @@ class ServerSelectiveRepeat:
 
         header = (opcode, finalChecksum, nseq)
 
-        # fixed chunksize (4096 bytes)
+        
         chunksize = CHUNKSIZE.to_bytes(4, BYTEORDER)
 
         message = Packet.pack_file_transfer_type_response(header, chunksize)
@@ -86,7 +86,7 @@ class ServerSelectiveRepeat:
                                                      ):
                     Logger.LogWarning(
                         f"There has been a timeout in Seending \
-                            No Disk Error Packet)")
+                        No Disk Error Packet. Retransmiting packet")
                     self.sendNoDiskSpaceErrorPacket()
                     noDiskSpacePacketSentTime = time.time()
 
@@ -117,20 +117,19 @@ class ServerSelectiveRepeat:
 
                 distinctAcksSent = len(acksSent)
 
-                print(f"{distinctAcksSent} vs {totalPackets}")
-
-
             bytesInLatestPacket = filesize % CHUNKSIZE
+
             Logger.LogWarning(
                 f"There are {bytesInLatestPacket} \
                     bytes on the last packet. removing padding")
             file[len(file) - 1] = file[len(file) - 1][0:bytesInLatestPacket]
             Logger.LogWarning("Padding removed")
+
             self.saveFile(file, fileName)
 
             self.stopFileTransfer(totalPackets + 1, fileName, originalMd5)
 
-            print('Finalized uploading file')
+            Logger.LogInfo("Finalizing uploading file")
 
     def download(self, filename):
         self.window = []
@@ -139,7 +138,7 @@ class ServerSelectiveRepeat:
         completeName = os.path.join(self.storage, filename)
 
         try:
-            Logger.LogInfo(f"Download request for file: {completeName}")
+            Logger.LogInfo(f"Received a download request for file: {completeName}")
             with open(completeName, 'rb') as file:
                 file = file.read()
 
@@ -177,8 +176,8 @@ class ServerSelectiveRepeat:
 
                     for e in self.window:
                         if not e['isSent']:
-                            Logger.LogDebug(
-                                f"Sending packet with sequence: {e['nseq']}")
+                            Logger.LogInfo(
+                                f"Sending packet with nseq: {e['nseq']}")
                             self.sendPackage(
                                 payloadWithNseq[e['nseq']], e['nseq'])
                             e['sentAt'] = time.time()
@@ -192,9 +191,7 @@ class ServerSelectiveRepeat:
                         socketTimeouts = 0
                     except TimeoutError:
                         socketTimeouts += 1
-                        Logger.LogWarning(
-                            f"There has been a socket timeout \
-                            (number: {socketTimeouts})")
+
                     except BaseException:
                         Logger.LogError(
                             "There has been an error receiving the ACK")
@@ -207,17 +204,20 @@ class ServerSelectiveRepeat:
                         if (not e['isACKed']) and (time.time() -
                                                    e['sentAt'] >
                                                    SELECTIVE_REPEAT_PKT_TOUT):
+                            Logger.LogWarning(
+                                f"There has been a timeout in Sending \
+                                the packet with nseq {e['nseq']}. Retransmiting packet")
                             self.sendPackage(
                                 payloadWithNseq[e['nseq']], e['nseq'])
                             e['sentAt'] = time.time()
 
                     if self.window[0]['isACKed']:
-                        Logger.LogDebug("Moving window")
+                        Logger.LogDebug("Moving sending window")
                         self.moveSendWindow()
 
                 self.stopDownloading()
 
-                print('Finalized downloading file')
+                Logger.LogInfo("Finalizing downloading file")
             else:
                 Logger.LogError(
                     "The transaction could not be completed because \
@@ -239,16 +239,16 @@ class ServerSelectiveRepeat:
                         fileNotExistPacketTimeout = 0
                         fileNotExistPacketACKed = True
                 except TimeoutError:
-                    fileNotExistPacketTimeout += 1
-                    Logger.LogWarning(
-                        f"There has been a timeout (timeout \
-                        number: {fileNotExistPacketTimeout})")
+                    fileNotExistPacketTimeout += 1                       
 
                 if (not fileNotExistPacketACKed) and \
                         (time.time() -
                          fileNotExistPacketSentTime
                          >
                          SELECTIVE_REPEAT_PKT_TOUT):
+                    Logger.LogWarning(
+                        f"There has been a timeout in Sending \
+                        the File Not Exist packet. Retransmiting packet")
                     self.sendFileNotExistPacket()
                     fileNotExistPacketSentTime = time.time()
 
@@ -272,15 +272,13 @@ class ServerSelectiveRepeat:
 
         message = Packet.pack_download_response(header, payload)
 
-        Logger.LogDebug(
-            f"Im sending a packet with opcode: \
-            {Utils.bytesToInt(opcode)} and \
-            nseq: {Utils.bytesToInt(nseq)}")
+        Logger.LogInfo(
+            f"Sending the download request response, \
+            with nseq: {Utils.bytesToInt(nseq)}")
         self.send(message)
 
         nextPacketIsAnOk = False
 
-        Logger.LogDebug("Im waiting for the ack")
         receivedOpcode = self.receiveResponseACK()
 
         receivedErrorCode = False
@@ -288,6 +286,9 @@ class ServerSelectiveRepeat:
         while not nextPacketIsAnOk or receivedErrorCode:
             if receivedOpcode == \
                     DOWNLOAD_REQUEST_OPCODE:  # Client re-sent request
+                Logger.LogWarning(
+                    f"Retransmiting the download request response, \
+                    with nseq: {Utils.bytesToInt(nseq)}")
                 self.send(message)
                 receivedOpcode = self.receiveResponseACK()
             elif receivedOpcode == NO_DISK_SPACE_OPCODE:
@@ -323,6 +324,8 @@ class ServerSelectiveRepeat:
             header, payload = Packet.unpack_upload_request(received_message)
         else:
             header, payload = Packet.unpack_package(received_message)
+            Logger.LogInfo(f"Received packet with \
+                           nseq: {header['nseq']}")
 
         return header, payload
 
@@ -334,8 +337,11 @@ class ServerSelectiveRepeat:
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
+
         message = Packet.pack_ack(header)
-        Logger.LogInfo(f"Sending ACK {nseq} ")
+
+        Logger.LogInfo(f"Sending ACK wit nseq: {nseq} ")
+
         self.send(message)
 
     def moveReceiveWindow(self):
@@ -404,7 +410,6 @@ class ServerSelectiveRepeat:
 
         Logger.LogInfo("Sending stop file transfer message")
         self.send(message)
-        Logger.LogWarning(f"Sending this: {header} and this {payload}")
 
         stopFileTransferMsgSentAt = time.time()
 
@@ -447,7 +452,10 @@ class ServerSelectiveRepeat:
                 stopCommunicationSocketTimeout = 0
                 communicationFinished = True
             except TimeoutError:
-                # Acá se da por sentado que el cliente se cerró
+                Logger.LogWarning(
+                        f"There has been a timeout in waiting \
+                        for the Client response. I assume that \
+                        is closed")
                 stopCommunicationSocketTimeout += 1
 
         # CHEQUEAR MD5 QUE SEAN IGUALES
@@ -464,7 +472,7 @@ class ServerSelectiveRepeat:
 
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_package(header, payload)
-        Logger.LogInfo(f"About to send packet nseq: {nseq}")
+
         self.send(message)
 
     def moveSendWindow(self):
@@ -476,7 +484,9 @@ class ServerSelectiveRepeat:
                            serverPort) = self.socket.receive(ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
-        Logger.LogInfo(f"RECEIVED ACK. \t{header}")
+
+        Logger.LogInfo(f"Received ACK with nseq \t{header['nseq']}")
+
         opcode = header['opcode'].to_bytes(1, BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
@@ -486,7 +496,7 @@ class ServerSelectiveRepeat:
                 len(opcode + checksum + nseqToBytes)):
             return header['nseq']
         else:
-            Logger.LogWarning("Invalid checksum for ACK receeived")
+            Logger.LogWarning("Invalid checksum for ACK received")
             return header['nseq']
 
     def sendFileNotExistPacket(self):
@@ -499,7 +509,7 @@ class ServerSelectiveRepeat:
         header = (opcode, finalChecksum, nseqToBytes)
 
         message = Packet.pack_ack(header)
-        Logger.LogInfo("Sending file does \
+        Logger.LogWarning("Sending file does \
                        not exist error.")
 
         self.send(message)
@@ -514,10 +524,11 @@ class ServerSelectiveRepeat:
         header = (opcode, finalChecksum, nseqToBytes)
 
         message = Packet.pack_ack(header)
-        Logger.LogInfo("Sending not enough \
-                       space error.")
+        Logger.LogWarning("Sending not enough \
+                       space error message.")
 
         self.send(message)
 
     def closeSocket(self):
+        Logger.LogSuccess(f"The transaction with {self.clientAddress}:{self.clientPort} is finished.")
         self.socket.close()

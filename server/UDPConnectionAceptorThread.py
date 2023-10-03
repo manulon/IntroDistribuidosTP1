@@ -86,9 +86,6 @@ class UDPConnectionAceptorThread(threading.Thread):
 
         firstPacketIsValid = self.isChecksumOK(header, payload)
 
-        Logger.LogDebug(
-            f"Is the first packet valid? The answer is {firstPacketIsValid}")
-
         return firstPacketIsValid, header, payload, clientAddress, clientPort
 
     def isChecksumOK(self, header, payload):
@@ -107,8 +104,6 @@ class UDPConnectionAceptorThread(threading.Thread):
     def force_stop(self):
         self.allowedToRun = False
         self.serverSocket.close()
-        for k in self.clients.keys():
-            self.clients[k].force_stop()
         for k in self.clients.keys():
             self.clients[k].join()
             Logger.LogDebug(f"The connection with {k[0]}:{k[1]} is finished.")

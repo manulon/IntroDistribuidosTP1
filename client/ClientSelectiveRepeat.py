@@ -383,8 +383,7 @@ class ClientSelectiveRepeat:
 
             bytesInLatestPacket = filesize % CHUNKSIZE
             Logger.LogWarning(
-                "There are {bytesInLatestPacket} \
-                   bytes on the las packet. removing padding")
+                "There are {bytesInLatestPacket} bytes on the las packet. removing padding")
             file[len(file) - 1] = \
                 file[len(file) - 1][0:bytesInLatestPacket]
             Logger.LogWarning("Padding removed")
