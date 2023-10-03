@@ -78,16 +78,15 @@ class ServerSelectiveRepeat:
                         noDiskSpacePacketACKed = True
                 except TimeoutError:
                     noDiskSpacePacketTimeout += 1
-                    Logger.LogWarning(
-                        f"There has been a timeout \
-                            (timeout number: {noDiskSpacePacketTimeout})")
 
                 if (not noDiskSpacePacketACKed) and (time.time() -
                                                      noDiskSpacePacketSentTime
                                                      >
                                                      SELECTIVE_REPEAT_PKT_TOUT
                                                      ):
-                    Logger.LogDebug("Enviando el reintento")
+                    Logger.LogWarning(
+                        f"There has been a timeout in Seending \
+                            No Disk Error Packet)")
                     self.sendNoDiskSpaceErrorPacket()
                     noDiskSpacePacketSentTime = time.time()
 
