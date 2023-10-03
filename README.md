@@ -9,8 +9,11 @@
     python3 start-server.py -v -s "./custom_folder"
 
 # Subir un archivo
-    python3 upload.py -n "lorem-ipsum.txt" -v
+    python3 upload.py -n "lorem-ipsum.txt" -v -p 15000
 
+# Subir un archivo
+    python3 download.py -n "lorem-ipsum.txt" -v -p 15001
+    
 El programa preguntará el protocolo a utilizar, seleccionar 1 para Selective Repeat, 2 para Stop&Wait
 
 # Generar un archivo con contenido aleatorio de de 1Gb 
