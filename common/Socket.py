@@ -1,4 +1,5 @@
-from socket import *
+from socket import socket, AF_INET, SOCK_DGRAM
+
 
 class Socket:
     def __init__(self, port, address):
@@ -13,7 +14,7 @@ class Socket:
 
     # bufsize: bytes que debo recibir
     def receive(self, bufsize):
-        return self.socket.recvfrom(bufsize)      
+        return self.socket.recvfrom(bufsize)
 
     def close(self):
         self.socket.close()
@@ -24,9 +25,9 @@ class Socket:
 
     def getPort(self):
         return self.port
-    
+
     def getAddress(self):
         return self.address
-    
+
     def isOpen(self):
         return self.isSocketOpen
