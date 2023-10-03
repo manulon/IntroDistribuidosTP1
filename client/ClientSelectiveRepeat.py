@@ -1,5 +1,5 @@
-from common.Checksum import *
-from common.Logger import *
+from common.Checksum import Checksum
+from common.Logger import Logger
 from tqdm import tqdm
 import hashlib
 import math
