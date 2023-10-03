@@ -133,7 +133,6 @@ class ServerStopAndWait:
                 # package = Packet.pack_package(header, payload)
                 # if self.isChecksumOK(header, payload):
                 self.sendACK(header['nseq'])
-                Logger.LogDebug(f"Sent ACK {header['nseq']}")
                 file.append(payload)
                 nextNseq = acksSent % 2
                 acksSent += 1
