@@ -1,5 +1,5 @@
-from common.Checksum import get_checksum, is_checksum_valid
-from common.Logger import LogInfo, LogWarning, LogError, LogDebug
+from common.Checksum import *
+from common.Logger import *
 from tqdm import tqdm
 import hashlib
 import math
@@ -51,7 +51,7 @@ class ClientSelectiveRepeat:
             filesize = len(file)
             totalPackets = math.ceil(filesize / CHUNKSIZE)
 
-            LogInfo(
+            Logger.LogInfo(
                 f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()}\
                 - Packets to send: {totalPackets}")
 
@@ -73,7 +73,7 @@ class ClientSelectiveRepeat:
                     communicationStarted = True
                 except TimeoutError:
                     initCommunicationSocketTimeout += 1
-                    LogWarning(
+                    Logger.LogWarning(
                         f"There has been a timeout (timeout number: \
                             {initCommunicationSocketTimeout})")
 
@@ -85,7 +85,7 @@ class ClientSelectiveRepeat:
                     firstPacketSentTime = time.time()
 
             if not errorCode:
-                LogInfo(f"Total de paquetes a enviar {totalPackets}")
+                Logger.LogInfo(f"Total de paquetes a enviar {totalPackets}")
                 packetsACKed = 0
                 packetsPushed = 0
                 nseq = 1
@@ -113,7 +113,7 @@ class ClientSelectiveRepeat:
 
                         for e in self.window:
                             if not e['isSent']:
-                                LogDebug(
+                                Logger.LogDebug(
                                     f"Sending packet with sequence: \
                                         {e['nseq']}")
                                 self.sendPackage(
@@ -129,11 +129,11 @@ class ClientSelectiveRepeat:
                             socketTimeouts = 0
                         except TimeoutError:
                             socketTimeouts += 1
-                            LogWarning(
+                            Logger.LogWarning(
                                 f"There has been a socket timeout (number: \
                                     {socketTimeouts})")
                         except BaseException:
-                            LogError(
+                            Logger.LogError(
                                 "There has been an error receiving the ACK")
 
                         for e in self.window:
@@ -141,7 +141,7 @@ class ClientSelectiveRepeat:
                             if (not e['isACKed']) and ackReceived == e['nseq']:
                                 e['isACKed'] = True
                                 packetsACKed += 1
-                                LogDebug(
+                                Logger.LogDebug(
                                     f"ACKed {packetsACKed} packets")
                             if (not e['isACKed']) and (
                                     time.time() - e['sentAt'] >
@@ -155,7 +155,7 @@ class ClientSelectiveRepeat:
                                 e['sentAt'] = time.time()
 
                         if self.window[0]['isACKed']:
-                            LogDebug("Moving window")
+                            Logger.LogDebug("Moving window")
                             self.moveSendWindow()
 
                 print("Verifying file...")
@@ -164,18 +164,18 @@ class ClientSelectiveRepeat:
                 print('File transfer has completed.')
 
             else:
-                LogError("The transaction could not be completed \
+                Logger.LogError("The transaction could not be completed \
                          because the server has not enough space \
                          to allocate the file")
 
         except FileNotFoundError:
-            LogError("The file does not exist. You can't upload it.")
+            Logger.LogError("The file does not exist. You can't upload it.")
 
     def sendUploadRequest(self, fileName, fileSize, md5):
         opcode = bytes([UPLOAD_REQUEST_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseq,
             len(opcode + zeroedChecksum + nseq), 'sendUploadRequest')
         header = (opcode, finalChecksum, nseq)
@@ -210,13 +210,13 @@ class ClientSelectiveRepeat:
         nseqToBytes = (nseq).to_bytes(4, BYTEORDER)
 
         # Checksum has to go first, for alignment and calculation
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendPackage')
 
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_package(header, payload)
-        LogInfo(f"About to send packet nseq: {nseq}")
+        Logger.LogInfo(f"About to send packet nseq: {nseq}")
         self.send(message)
 
     def receiveACK(self):
@@ -224,17 +224,17 @@ class ClientSelectiveRepeat:
                            serverPort) = self.socket.receive(ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
-        LogInfo(f"RECEIVED ACK. \t{header}")
+        Logger.LogInfo(f"RECEIVED ACK. \t{header}")
         opcode = header['opcode'].to_bytes(1, BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
 
-        if is_checksum_valid(
+        if Checksum.is_checksum_valid(
                 checksum + opcode + nseqToBytes,
                 len(opcode + checksum + nseqToBytes)):
             return header['nseq']
         else:
-            LogWarning("Invalid checksum for ACK receeived")
+            Logger.LogWarning("Invalid checksum for ACK receeived")
             return header['nseq']
 
     def moveSendWindow(self):
@@ -249,14 +249,14 @@ class ClientSelectiveRepeat:
         header, payload = Packet.unpack_stop_file_transfer(received_message)
 
         if payload["state"] == 0:
-            LogError(
+            Logger.LogError(
                 "There's been an error uploading the file \
                 in the server. File corrupt in the server")
 
         opcode = bytes([FINAL_ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (header['nseq']).to_bytes(4, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'stopUploading')
         header = (opcode, finalChecksum, nseqToBytes)
@@ -304,7 +304,7 @@ class ClientSelectiveRepeat:
                 communicationStarted = True
             except TimeoutError:
                 initCommunicationSocketTimeout += 1
-                LogWarning(
+                Logger.LogWarning(
                     f"There has been a timeout (timeout number: \
                         {initCommunicationSocketTimeout})")
 
@@ -319,7 +319,7 @@ class ClientSelectiveRepeat:
             filesize = receivedMessagePayload['filesize']
 
             if not self.isFileSizeOk(filesize):
-                LogError(
+                Logger.LogError(
                     f"Not enough space for download \
                         {filesize/1000}kB are needed")
                 self.sendNoDiskSpaceErrorPacket()
@@ -327,7 +327,7 @@ class ClientSelectiveRepeat:
 
             md5 = receivedMessagePayload['md5']
 
-            LogDebug(
+            Logger.LogDebug(
                 f"You are about to download a file of \
                     {filesize} bytes and with an md5 of {md5}")
 
@@ -349,7 +349,7 @@ class ClientSelectiveRepeat:
                     firstPacketArrived = True
                 except TimeoutError:
                     sendConnectionACKSocketTimeout += 1
-                    LogWarning(
+                    Logger.LogWarning(
                         f"There has been a timeout (timeout number: \
                             {sendConnectionACKSocketTimeout})")
 
@@ -390,12 +390,12 @@ class ClientSelectiveRepeat:
                     self.moveReceiveWindow()
 
             bytesInLatestPacket = filesize % CHUNKSIZE
-            LogWarning(
+            Logger.LogWarning(
                 "There are {bytesInLatestPacket} \
                    bytes on the las packet. removing padding")
             file[len(file) - 1] = \
                 file[len(file) - 1][0:bytesInLatestPacket]
-            LogWarning("Padding removed")
+            Logger.LogWarning("Padding removed")
             self.saveFile(file, fileNameModified)
 
             self.stopFileTransfer(totalPackets + 1, fileNameModified, md5)
@@ -403,7 +403,7 @@ class ClientSelectiveRepeat:
             print('File transfer has ended.')
 
         else:
-            LogError(
+            Logger.LogError(
                 "The file does not exist in the \
                     server. You can't download it.")
 
@@ -411,7 +411,7 @@ class ClientSelectiveRepeat:
         opcode = bytes([0x2])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseq = (0).to_bytes(1, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseq,
             len(opcode + zeroedChecksum + nseq), 'sendDownloadRequest')
         header = (opcode, finalChecksum, nseq)
@@ -460,7 +460,7 @@ class ClientSelectiveRepeat:
         checksum = (header['checksum']).to_bytes(4, BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, BYTEORDER)
 
-        return is_checksum_valid(
+        return Checksum.is_checksum_valid(
             checksum + opcode + nseqToBytes,
             len(opcode + checksum + nseqToBytes))
 
@@ -468,24 +468,24 @@ class ClientSelectiveRepeat:
         opcode = bytes([ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_ack(header)
-        LogInfo(f"Sending ACK {nseq} ")
+        Logger.LogInfo(f"Sending ACK {nseq} ")
         self.send(message)
 
     def sendConnectionACK(self):
         opcode = bytes([INIT_DOWNLOAD_ACK_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (0).to_bytes(4, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_ack(header)
-        LogInfo("Sending Connection ACK")
+        Logger.LogInfo("Sending Connection ACK")
         self.send(message)
 
     def saveFile(self, file, fileName):
@@ -496,14 +496,14 @@ class ClientSelectiveRepeat:
         for i in range(0, len(file)):
             fileWriter.write(file[i])
 
-        LogInfo(f"File written into: {completeName}")
+        Logger.LogInfo(f"File written into: {completeName}")
         fileWriter.close()
 
     def stopFileTransfer(self, nseq, fileName, originalMd5):
         opcode = bytes([STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
@@ -514,8 +514,8 @@ class ClientSelectiveRepeat:
             file = file.read()
 
         md5 = hashlib.md5(file)
-        LogDebug(f"File client MD5: \t{md5.hexdigest()}")
-        LogDebug(f"Server's MD5: \t\t{originalMd5.hex()}")
+        Logger.LogDebug(f"File client MD5: \t{md5.hexdigest()}")
+        Logger.LogDebug(f"Server's MD5: \t\t{originalMd5.hex()}")
 
         state = bytes([STATE_ERROR])  # Not okay by default
         if md5.hexdigest() == originalMd5.hex():
@@ -533,12 +533,12 @@ class ClientSelectiveRepeat:
         opcode = bytes([NO_DISK_SPACE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = (0).to_bytes(4, BYTEORDER)
-        finalChecksum = get_checksum(
+        finalChecksum = Checksum.get_checksum(
             zeroedChecksum + opcode + nseqToBytes, len(
                 opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
 
         message = Packet.pack_ack(header)
-        LogInfo("Sending not enough space error.")
+        Logger.LogInfo("Sending not enough space error.")
 
         self.send(message)

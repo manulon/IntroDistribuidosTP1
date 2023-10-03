@@ -119,12 +119,10 @@ class ClientStopAndWait:
                     'Not enough disk space in server to upload file')
             elif opcode == const.FILE_TOO_BIG_OPCODE:
                 Logger.LogError('File too big, not supported by protocol')
-            elif opcode == const.FILE_ALREADY_EXISTS_OPCODE:
-                Logger.LogError(
-                    'The file that you are trying to upload \
-                        already exists in the server')
             else:
                 Logger.LogError('Uknown error, retry')
+
+            #self.sendACK(0)
             return const.ERROR_CODE
 
         '''
@@ -254,13 +252,30 @@ class ClientStopAndWait:
                 initCommunicationSocketTimeout = 0
                 communicationStarted = True
                 if fileSize >= Utils.getFreeDiskSpace():
-                    Logger.LogError(
-                        f"Not enough space for download \
-                            {fileSize/1000}kB are needed")
+                    Logger.LogError(f"Not enough space for download. {fileSize/1000}kB are needed")
+                    self.sendNoDiskSpaceError()
+                    errorSentTime = time.time()
+                    errorTimeouts = 0
+                    Logger.LogDebug("Sent error")
+                    receivedErrorACK = False
+                    while (errorTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not receivedErrorACK):
+                        try:
+                            self.socket.settimeout(0.2)
+                            ackNseq = self.receiveACK()
+                            Logger.LogDebug(f"Received ACK {ackNseq}")
+                            errorTimeouts = 0
+                            receivedErrorACK = True
+                        except TimeoutError:
+                            Logger.LogWarning(f"There has been a timeout on the servers ACK for an error (timeout number: {errorTimeouts})")
+                            errorTimeouts += 1
+
+                        if (not communicationStarted) and (time.time() - errorSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                            self.sendNoDiskSpaceError()
+                            errorSentTime = time.time() 
                     return
                 if opcode == const.FILE_DOES_NOT_EXIST_OPCODE:
-                    Logger.LogError(
-                        f"File {fileName} does not exist in the server")
+                    Logger.LogError(f"File {fileName} does not exist in the server")
+                    self.sendACK(0)
                     return
                 if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
                     Logger.LogError("Unknown error")
@@ -284,27 +299,49 @@ class ClientStopAndWait:
                 {fileSize} bytes and with an md5 of {md5}")
 
         self.sendConnectionACK()
+        packetSentTime = time.time()
+        sendConnectionACKSocketTimeout = 0
+        firstPacketArrived = False
+        header = None
+        payload = None
+
+        while (not firstPacketArrived) and (sendConnectionACKSocketTimeout < const.CLIENT_SOCKET_TIMEOUTS):
+            try:
+                self.socket.settimeout(0.2)
+                header, payload = self.receivePacket()
+                firstPacketArrived = True
+                sendConnectionACKSocketTimeout = 0
+                Logger.LogDebug(f"Received first packet")
+            except TimeoutError:                
+                sendConnectionACKSocketTimeout += 1
+                Logger.LogWarning(f"There has been a timeout (timeout number: {sendConnectionACKSocketTimeout})")
+
+            if (not firstPacketArrived) and (time.time() - packetSentTime > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+                self.sendConnectionACK()
+                packetSentTime = time.time()
+
         file = []
         totalPackets = math.ceil(fileSize / const.CHUNKSIZE)
         acksSent = 0
         nextNseq = 1
+        firstIteration = True
         # enviar ok al servidor para que arranque la descarga
         while acksSent < totalPackets:
-            header, payload = self.receivePacket()
-            if header['nseq'] == nextNseq:
-                # package = Packet.pack_package(header, payload)
-                # if self.isChecksumOK(header, payload):
+            if not firstIteration:
+                header, payload = self.receivePacket()
+            else:
+                firstIteration = False
+            if header != None and header['nseq'] == nextNseq:
+                #if self.isChecksumOK(header, payload):     
                 self.sendACK(header['nseq'])
                 Logger.LogDebug(f"Sent ACK {header['nseq']}")
                 file.append(payload)
                 nextNseq = acksSent % 2
                 acksSent += 1
-                # else:
-                # Logger.LogError('Checksum error') # client resends packet
-                # (corrupted packet)
-            else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
-                # server only resends ACK (detects duplicate)
-                self.sendACK(header['nseq'])
+                #else: # case 2 (lost packet)
+                #    Logger.LogError(f"Checksum error")
+            else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
+                self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
                 Logger.LogDebug(f"RE-Sent ACK {header['nseq']}")
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
@@ -317,6 +354,13 @@ class ClientStopAndWait:
         self.saveFile(file, fileName)
         newMd5, state = self.checkFileMD5(fileName, md5)
         self.stopFileTransfer(nextNseq, fileName, newMd5, state)
+    
+    def isChecksumOK(self, header, payload):
+        opcode = header['opcode'].to_bytes(1, const.BYTEORDER)
+        checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
+        
+        return Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes))
 
     def sendDownloadRequest(self, fileName):
         opcode = bytes([const.DOWNLOAD_REQUEST_OPCODE])
@@ -447,4 +491,13 @@ class ClientStopAndWait:
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)
 
+        self.send(message)
+        
+    def sendNoDiskSpaceError(self):
+        opcode = bytes([const.NO_DISK_SPACE_OPCODE])
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = (0).to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        header = (opcode, finalChecksum, nseqToBytes)
+        message = Packet.pack_file_too_big_error(header)
         self.send(message)
