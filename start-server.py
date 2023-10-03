@@ -1,7 +1,7 @@
-import os
 import getopt
 import sys
-from common.constants import *
+from common.constants import LOG_LEVEL_WARNING, \
+    LOG_LEVEL_DEBUG, LOG_LEVEL_ERROR
 from server.Server import Server
 from common.Logger import Logger
 
@@ -13,15 +13,21 @@ def main(argv):
     storage = "./server_files/"
 
     try:
-        opts, args = getopt.getopt(argv, "hvqH:p:s:", ["help", "verbose", "quiet", "host=", "port=", "storage="])
+        opts, args = getopt.getopt(
+            argv, "hvqH:p:s:", [
+                "help", "verbose", "quiet", "host=", "port=", "storage="])
     except getopt.GetoptError:
         sys.exit(2)
     for opt, arg in opts:
         # HELP
         if opt in ("-h", "--help"):
-            print("usage: start-server [-h] [-v | -q] [-H ADDR] [-p PORT] [-s DIRPATH]")
+            print(
+                "usage: start-server [-h] [-v | -q] [-H ADDR] \
+                    [-p PORT] [-s DIRPATH]")
             print()
-            print("Upload/Download a file up to 4 gb from the server, using UDP over an RDT connection")
+            print(
+                "Upload/Download a file up to 4 gb from the server\
+                    , using UDP over an RDT connection")
             print("It supports:")
             print("\tSelective Repeat")
             print("\tStop and wait")
@@ -34,16 +40,16 @@ def main(argv):
             print("  -p, --port     service port")
             print("  -s, --storage  storage dir path")
             sys.exit(0)
-        
+
         # VERBOSE
         elif opt in ("-v", "--verbose"):
             Logger.SetLogLevel(LOG_LEVEL_DEBUG)
-            Logger.LogInfo("Verbosity will now be set to Debug")            
+            Logger.LogInfo("Verbosity will now be set to Debug")
 
         # QUIET
         elif opt in ("-q", "--quiet"):
             Logger.LogInfo("Verbosity will now be set to Error")
-            Logger.SetLogLevel(LOG_LEVEL_ERROR)            
+            Logger.SetLogLevel(LOG_LEVEL_ERROR)
 
         # HOST
         elif opt in ("-H", "--host"):
@@ -62,10 +68,10 @@ def main(argv):
                 storage += '/'
             Logger.LogInfo(f"Storage {storage}")
 
-
     server = Server(host_service_ip_address, port_service_port, storage)
     server.start()
     server.close()
+
 
 if __name__ == '__main__':
     main(sys.argv[1:])
