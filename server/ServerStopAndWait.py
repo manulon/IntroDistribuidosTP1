@@ -216,12 +216,14 @@ class ServerStopAndWait:
         packetsPushed = 0
 
         socketTimeouts = 0
+        ackNseq = -1
         while (packetsPushed < totalPackets and socketTimeouts <
                const.CLIENT_SOCKET_TIMEOUTS):
             sequenceNumber = (packetsPushed + 1) % 2  # starts in 1
             payload = file[packetsPushed *
                            chunksize: (packetsPushed + 1) * chunksize]
             self.sendPacket(sequenceNumber, payload)
+            packetSentTime = time.time()
             Logger.LogDebug(f"Sent packet {sequenceNumber}")
             try:
                 self.socket.settimeout(const.TIMEOUT)
@@ -253,6 +255,12 @@ class ServerStopAndWait:
                     (number: {socketTimeouts})")
             except BaseException:
                 Logger.LogError("There has been an error receiving the ACK")
+            if (ackNseq != sequenceNumber) and (
+                    time.time() - packetSentTime
+                    > const.SELECTIVE_REPEAT_PACKET_TIMEOUT
+                ):
+                    self.sendPacket(sequenceNumber, payload)
+                    packetSentTime = time.time()
 
             # Case 1: Packet received => ACK received
             # Case 2: Packet lost => timeout => do nothing (resend)
