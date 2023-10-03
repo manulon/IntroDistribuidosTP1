@@ -366,10 +366,11 @@ class ClientStopAndWait:
                 Logger.LogDebug(f"Sending ACK with nseq: {header['nseq']}")
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
-        Logger.LogWarning(
-            f"There are {bytesInLatestPacket} \
-                bytes on the last packet. removing padding")
-        file[fileSize - 1] = file[fileSize - 1][0:(bytesInLatestPacket-1)]
+        if bytesInLatestPacket != 0:
+            Logger.LogWarning(
+                f"There are {bytesInLatestPacket} \
+                    bytes on the last packet. removing padding")
+            file[len(file) - 1] = file[len(file) - 1][0:(bytesInLatestPacket-1)]
         Logger.LogWarning("Padding removed")
 
         self.saveFile(file, fileName)

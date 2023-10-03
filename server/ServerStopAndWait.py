@@ -145,7 +145,8 @@ class ServerStopAndWait:
         Logger.LogWarning(
             f"There are {bytesInLatestPacket} \
             bytes on the last packet. removing padding")
-        file[fileSize - 1] = file[fileSize - 1][0:(bytesInLatestPacket-1)]
+        if bytesInLatestPacket != 0:
+            file[fileSize - 1] = file[fileSize - 1][0:(bytesInLatestPacket-1)]
         Logger.LogWarning("Padding removed")
 
         # if state == STATE_OK:
