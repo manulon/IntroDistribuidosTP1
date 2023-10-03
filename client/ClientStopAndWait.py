@@ -195,11 +195,17 @@ class ClientStopAndWait:
 
     def sendPacket(self, nseq, payload):
         opcode = bytes([const.PACKET_OPCODE])
-        checksum = (2).to_bytes(4, const.BYTEORDER)
-        nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
-        header = (opcode, checksum, nseqToBytes)
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = (nseq).to_bytes(4, const.BYTEORDER)
 
+        # Checksum has to go first, for alignment and calculation
+        finalChecksum = Checksum.get_checksum(
+            zeroedChecksum + opcode + nseqToBytes, len(
+                opcode + zeroedChecksum + nseqToBytes), 'sendPackage')
+
+        header = (opcode, finalChecksum, nseqToBytes)
         message = Packet.pack_package(header, payload)
+        Logger.LogInfo(f"About to send packet nseq: {nseq}")
         self.send(message)
 
     def send(self, message):
@@ -357,14 +363,12 @@ class ClientStopAndWait:
             else:
                 firstIteration = False
             if header is not None and header['nseq'] == nextNseq:
-                # if self.isChecksumOK(header, payload):
-                self.sendACK(header['nseq'])
-                Logger.LogDebug(f"Sent ACK {header['nseq']}")
-                file.append(payload)
-                nextNseq = acksSent % 2
-                acksSent += 1
-                # else: # case 2 (lost packet)
-                #    Logger.LogError(f"Checksum error")
+                if self.isChecksumOK(header, payload):
+                    self.sendACK(header['nseq'])
+                    Logger.LogDebug(f"Sent ACK {header['nseq']}")
+                    file.append(payload)
+                    nextNseq = acksSent % 2
+                    acksSent += 1
             else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
                 self.sendACK(header['nseq'])
                 # server only resends ACK (detects duplicate)

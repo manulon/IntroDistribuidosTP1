@@ -132,16 +132,12 @@ class ServerStopAndWait:
         while acksSent < totalPackets:
             header, payload = self.receivePacket()
             if header['nseq'] == nextNseq:
-                # package = Packet.pack_package(header, payload)
-                # if self.isChecksumOK(header, payload):
-                self.sendACK(header['nseq'])
-                Logger.LogDebug(f"Sent ACK {header['nseq']}")
-                file.append(payload)
-                nextNseq = acksSent % 2
-                acksSent += 1
-                # else:
-                # Logger.LogError('Checksum error') # client resends packet
-                # (corrupted packet)
+                if self.isChecksumOK(header, payload):
+                    self.sendACK(header['nseq'])
+                    Logger.LogDebug(f"Sent ACK {header['nseq']}")
+                    file.append(payload)
+                    nextNseq = acksSent % 2
+                    acksSent += 1
             else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
                 # server only resends ACK (detects duplicate)
                 self.sendACK(header['nseq'])
@@ -271,9 +267,12 @@ class ServerStopAndWait:
 
     def sendPacket(self, nseq, payload):
         opcode = bytes([const.PACKET_OPCODE])
-        checksum = (2).to_bytes(4, const.BYTEORDER)
-        nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
-        header = (opcode, checksum, nseqToBytes)
+        zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
+        nseqToBytes = (nseq).to_bytes(4, const.BYTEORDER)
+        finalChecksum = Checksum.get_checksum(
+            zeroedChecksum + opcode + nseqToBytes, len(
+                opcode + zeroedChecksum + nseqToBytes), 'sendPackage')
+        header = (opcode, finalChecksum, nseqToBytes)
 
         message = Packet.pack_package(header, payload)
         self.send(message)
@@ -412,13 +411,9 @@ class ServerStopAndWait:
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
 
-        return Checksum.is_checksum_valid(checksum +
-                                          opcode +
-                                          nseqToBytes +
-                                          payload, len(opcode +
-                                                       checksum +
-                                                       nseqToBytes +
-                                                       payload))
+        return Checksum.is_checksum_valid(
+            checksum + opcode + nseqToBytes,
+            len(opcode + checksum + nseqToBytes))
 
     def stopFileTransfer(self, nseq, fileName, md5, state):
         opcode = bytes([const.STOP_FILE_TRANSFER_OPCODE])
