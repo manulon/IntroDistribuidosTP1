@@ -99,6 +99,8 @@ class Packet:
             f"In packet, I'm about to send packet "
             f"with size: "
             f"{size}"
+            f"and nseq:"
+            f"{nseq}"
             )
 
         return struct.pack(
