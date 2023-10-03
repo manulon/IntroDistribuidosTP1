@@ -133,6 +133,7 @@ class ServerStopAndWait:
                 if self.isChecksumOK(header, payload):
                     self.sendACK(header['nseq'])
                     file.append(payload)
+                    lastNseqReceived = header['nseq']
                     nextNseq = acksSent % 2
                     acksSent += 1
             else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
@@ -150,7 +151,7 @@ class ServerStopAndWait:
         # if state == STATE_OK:
         self.saveFile(file, fileName)
         md5, state = self.checkFileMD5(fileName, originalMd5)
-        self.stopFileTransfer(nextNseq, fileName, md5, state)
+        self.stopFileTransfer(nextNseq, fileName, md5, state, lastNseqReceived)
 
     def download(self, filename):
         filename = filename.rstrip('\x00')
@@ -395,7 +396,7 @@ class ServerStopAndWait:
             checksum + opcode + nseqToBytes,
             len(opcode + checksum + nseqToBytes))
 
-    def stopFileTransfer(self, nseq, fileName, md5, state):
+    def stopFileTransfer(self, nseq, fileName, md5, state, lastNseqReceived):
         opcode = bytes([const.STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
@@ -420,8 +421,12 @@ class ServerStopAndWait:
                 self.socket.settimeout(const.TIMEOUT)
                 received_message, (serverAddres, serverPort) =\
                     self.socket.receive(const.ACK_SIZE)
-                stopCommunicationSocketTimeout = 0
-                communicationFinished = True
+                header = Packet.unpack_ack(received_message)
+                if header['nseq'] == lastNseqReceived:
+                    self.sendACK(lastNseqReceived)
+                else:
+                    stopCommunicationSocketTimeout = 0
+                    communicationFinished = True
             except TimeoutError:
                 # We assume the client has already sent the ACK and closed the
                 # connection
