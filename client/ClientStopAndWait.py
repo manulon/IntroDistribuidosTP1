@@ -38,6 +38,7 @@ class ClientStopAndWait:
         md5 = hashlib.md5(file)
         filesize = len(file)
 
+        Logger.LogInfo("Sending (1st time) packet sendUploadRequest")
         self.sendUploadRequest(filename, filesize, md5.digest())
         firstPacketSentTime = time.time()
         communicationStarted = False
@@ -56,7 +57,7 @@ class ClientStopAndWait:
                 initCommunicationSocketTimeout += 1
                 Logger.LogWarning(
                     f"There has been a timeout (timeout number: \
-                        {initCommunicationSocketTimeout})")
+                        {initCommunicationSocketTimeout}), (receiveFileTransferTypeResponse)")
 
             if (not communicationStarted) and (time.time() -
                                                firstPacketSentTime >
@@ -64,6 +65,7 @@ class ClientStopAndWait:
                                                SELECTIVE_REPEAT_PACKET_TIMEOUT
                                                ):
                 self.sendUploadRequest(filename, filesize, md5.digest())
+                Logger.LogInfo("Retransmiting packet sendUploadRequest")
                 firstPacketSentTime = time.time()
 
         if chunksize == const.ERROR_CODE:
@@ -168,7 +170,7 @@ class ClientStopAndWait:
                         socketTimeouts += 1
                         Logger.LogWarning(
                             f"There has been a socket timeout \
-                                (number: {socketTimeouts})")
+                                (number: {socketTimeouts}), waiting for an ACK")
                     except BaseException:
                         Logger.LogError(
                             "There has been an error receiving the ACK")
@@ -176,7 +178,7 @@ class ClientStopAndWait:
                 socketTimeouts += 1
                 Logger.LogWarning(
                     f"There has been a socket timeout \
-                        (number: {socketTimeouts})")
+                        (number: {socketTimeouts}) ACK not received before timeout")
             except BaseException:
                 Logger.LogError("There has been an error receiving the ACK")
 
@@ -240,6 +242,7 @@ class ClientStopAndWait:
         communicationStarted = False
         md5 = None
         Logger.LogInfo(f"About to start downloading: {fileName}")
+        Logger.LogInfo("Sending (1st time) packet sendDownloadRequest")
 
         self.sendDownloadRequest(fileName)
         firstPacketSentTime = time.time()
@@ -286,6 +289,7 @@ class ClientStopAndWait:
                     self.sendACK(0)
                     return
                 if opcode != const.DOWNLOAD_REQUEST_RESPONSE_OPCODE:
+                    Logger.LogError(f"{opcode}")
                     Logger.LogError("Unknown error")
                     return
             except TimeoutError:
@@ -299,6 +303,7 @@ class ClientStopAndWait:
                                                const.
                                                SELECTIVE_REPEAT_PACKET_TIMEOUT
                                                ):
+                Logger.LogInfo("Retransmiting packet sendDownloadRequest")
                 self.sendDownloadRequest(fileName)
                 firstPacketSentTime = time.time()
 
@@ -343,6 +348,7 @@ class ClientStopAndWait:
         while acksSent < totalPackets:
             if not firstIteration:
                 header, payload = self.receivePacket()
+                Logger.LogDebug(f"Received packet with nseq: {header['nseq']}")
             else:
                 firstIteration = False
             if header is not None and header['nseq'] == nextNseq:
@@ -417,7 +423,7 @@ class ClientStopAndWait:
                 self.serverPort = udpServerThreadPort
             except TimeoutError:
                 socketTimeouts += 1
-                Logger.LogError("There has been a timeout")
+                Logger.LogWarning("There has been a timeout")
             except BaseException:
                 Logger.LogError(
                     "There has been an error receiving the download response")
