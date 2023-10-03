@@ -95,68 +95,65 @@ class ClientSelectiveRepeat:
                 while (
                         packetsACKed != totalPackets) and (
                         socketTimeouts < CLIENT_SOCKET_TIMEOUTS):
-                    for i in tqdm(
+                    '''for i in tqdm(
                             range(totalPackets),
                             desc="Uploading...",
                             ascii=False,
-                            ncols=75):
-                        while ((len(self.window) != 10) and (
-                                packetsPushed != totalPackets)):
-                            payloadAux = file[packetsPushed * CHUNKSIZE:
-                                              (packetsPushed + 1) * CHUNKSIZE]
-                            payloadWithNseq[nseq] = payloadAux
-                            self.window.append(
-                                {'nseq': nseq, 'isSent': False,
-                                 'isACKed': False, 'sentAt': None})
-                            packetsPushed += 1
-                            nseq += 1
+                            ncols=75):'''
+                    while ((len(self.window) != 10) and (
+                            packetsPushed != totalPackets)):
+                        payloadAux = file[packetsPushed * CHUNKSIZE:
+                                            (packetsPushed + 1) * CHUNKSIZE]
+                        payloadWithNseq[nseq] = payloadAux
+                        self.window.append(
+                            {'nseq': nseq, 'isSent': False,
+                                'isACKed': False, 'sentAt': None})
+                        packetsPushed += 1
+                        nseq += 1
 
-                        for e in self.window:
-                            if not e['isSent']:
-                                Logger.LogDebug(
-                                    f"Sending packet with sequence: \
-                                        {e['nseq']}")
-                                self.sendPackage(
-                                    payloadWithNseq[e['nseq']], e['nseq'])
-                                e['sentAt'] = time.time()
-                                e['isSent'] = True
+                    for e in self.window:
+                        if not e['isSent']:
+                            Logger.LogDebug(
+                                f"Sending packet with sequence: \
+                                    {e['nseq']}")
+                            self.sendPackage(
+                                payloadWithNseq[e['nseq']], e['nseq'])
+                            e['sentAt'] = time.time()
+                            e['isSent'] = True
 
-                        ackReceived = None
+                    ackReceived = None
 
-                        try:
-                            self.socket.settimeout(TIMEOUT)
-                            ackReceived = self.receiveACK()
-                            socketTimeouts = 0
-                        except TimeoutError:
-                            socketTimeouts += 1
-                            Logger.LogWarning(
-                                f"There has been a socket timeout (number: \
-                                    {socketTimeouts})")
-                        except BaseException:
-                            Logger.LogError(
-                                "There has been an error receiving the ACK")
+                    try:
+                        self.socket.settimeout(TIMEOUT)
+                        ackReceived = self.receiveACK()
+                        socketTimeouts = 0
+                    except TimeoutError:
+                        socketTimeouts += 1
+                        Logger.LogWarning(
+                            f"There has been a socket timeout (number: \
+                                {socketTimeouts})")
+                    except BaseException:
+                        Logger.LogError(
+                            "There has been an error receiving the ACK")
 
-                        for e in self.window:
+                    for e in self.window:
 
-                            if (not e['isACKed']) and ackReceived == e['nseq']:
-                                e['isACKed'] = True
-                                packetsACKed += 1
-                                Logger.LogDebug(
-                                    f"ACKed {packetsACKed} packets")
-                            if (not e['isACKed']) and (
-                                    time.time() - e['sentAt'] >
-                                    SELECTIVE_REPEAT_PACKET_TIMEOUT):
-                                if (e['nseq'] != totalPackets):
-                                    self.sendPackage(
-                                        payloadWithNseq[e['nseq']], e['nseq'])
-                                else:
-                                    self.sendLastPackage(
-                                        payloadWithNseq[e['nseq']], e['nseq'])
-                                e['sentAt'] = time.time()
+                        if (not e['isACKed']) and ackReceived == e['nseq']:
+                            e['isACKed'] = True
+                            packetsACKed += 1
+                            Logger.LogDebug(
+                                f"ACKed {packetsACKed} packets")
+                        if (not e['isACKed']) and (
+                                time.time() - e['sentAt'] >
+                                SELECTIVE_REPEAT_PACKET_TIMEOUT):
 
-                        if self.window[0]['isACKed']:
-                            Logger.LogDebug("Moving window")
-                            self.moveSendWindow()
+                            self.sendPackage(
+                                payloadWithNseq[e['nseq']], e['nseq'])
+                            e['sentAt'] = time.time()
+
+                    if self.window[0]['isACKed']:
+                        Logger.LogDebug("Moving window")
+                        self.moveSendWindow()
 
                 print("Verifying file...")
                 self.stopUploading(int(totalPackets + 1))
@@ -222,6 +219,7 @@ class ClientSelectiveRepeat:
     def receiveACK(self):
         received_message, (serverAddres,
                            serverPort) = self.socket.receive(ACK_SIZE)
+        Logger.LogDebug(f"RECEIVED MESSAGE {received_message}")
 
         header = Packet.unpack_ack(received_message)
         Logger.LogInfo(f"RECEIVED ACK. \t{header}")
@@ -243,6 +241,7 @@ class ClientSelectiveRepeat:
 
     def stopUploading(self, nseq):
         self.socket.settimeout(None)
+        Logger.LogDebug("Waiting for stop file transfer message")
         received_message, (serverAddres, serverPort) = self.socket.receive(
             STOP_FILE_TRANSFER_SIZE)
 
