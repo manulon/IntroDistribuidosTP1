@@ -423,6 +423,9 @@ class ClientStopAndWait:
                     "There has been an error receiving the download response")
                 return const.ERROR_CODE, 0, 0
 
+        if received_message is None:
+            return const.ERROR_CODE, 0, 0
+
         if Utils.bytesToInt(
                 received_message[:1]) == const.FILE_DOES_NOT_EXIST_OPCODE:
             return const.FILE_DOES_NOT_EXIST_OPCODE, 0, 0
