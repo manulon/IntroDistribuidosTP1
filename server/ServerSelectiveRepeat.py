@@ -85,7 +85,7 @@ class ServerSelectiveRepeat:
                                                      SELECTIVE_REPEAT_PKT_TOUT
                                                      ):
                     Logger.LogWarning(
-                        f"There has been a timeout in Seending \
+                        f"There has been a timeout in Sending \
                         No Disk Error Packet. Retransmiting packet")
                     self.sendNoDiskSpaceErrorPacket()
                     noDiskSpacePacketSentTime = time.time()

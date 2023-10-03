@@ -96,8 +96,7 @@ def main(argv):
     has_protocol = False
     while not has_protocol:
         protocol = input(
-            'What protocol do you want to use?: \n \
-                1) Selective Repeat \n 2) Stop and Wait \n')
+            'What protocol do you want to use?: \n 1) Selective Repeat \n 2) Stop and Wait \n')
         if (protocol == '1'):
             client.setProtocol(ClientSelectiveRepeat())
             has_protocol = True
