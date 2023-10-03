@@ -8,6 +8,7 @@ from common.Packet import Packet
 import common.constants as const
 from common.Utils import Utils
 
+
 class ServerStopAndWait:
     def __init__(self, socket, clientAddress, clientPort, storage):
         self.socket = socket
@@ -63,7 +64,9 @@ class ServerStopAndWait:
         opcode = bytes([const.FILE_TRANSFER_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
-        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
+        finalChecksum = Checksum.get_checksum(
+            zeroedChecksum + opcode + nseq,
+            len(opcode + zeroedChecksum + nseq), 'sendACK')
         header = (opcode, finalChecksum, nseq)
 
         # fixed chunksize (4096 bytes)
@@ -119,15 +122,19 @@ class ServerStopAndWait:
                 file.append(payload)
                 nextNseq = acksSent % 2
                 acksSent += 1
-                #else:
-                    #Logger.LogError('Checksum error') # client resends packet (corrupted packet)
-            else: # client resends packet - cases 3 (lost ACK) and 4 (timeout)
-                self.sendACK(header['nseq']) # server only resends ACK (detects duplicate)
+                # else:
+                # Logger.LogError('Checksum error') # client resends packet
+                # (corrupted packet)
+            else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
+                # server only resends ACK (detects duplicate)
+                self.sendACK(header['nseq'])
                 Logger.LogDebug(f"RE-Sent ACK {header['nseq']}")
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
-        Logger.LogWarning(f"There are {bytesInLatestPacket} bytes on the last packet. removing padding")
-        file[len(file)-1] = file[len(file)-1][0:bytesInLatestPacket]
+        Logger.LogWarning(
+            f"There are {bytesInLatestPacket} \
+            bytes on the last packet. removing padding")
+        file[len(file) - 1] = file[len(file) - 1][0:bytesInLatestPacket]
         Logger.LogWarning("Padding removed")
 
         # if state == STATE_OK:
@@ -138,7 +145,7 @@ class ServerStopAndWait:
     def download(self, filename):
 
         filename = filename.rstrip('\x00')
-        file:bytes
+        file: bytes
         completeName = os.path.join(self.storage, filename)
         Logger.LogInfo(f"Download request for file: {completeName}")
         try:
@@ -173,7 +180,9 @@ class ServerStopAndWait:
             self.sendACK(0)
             return
         totalPackets = math.ceil(filesize / const.CHUNKSIZE)
-        Logger.LogInfo(f"File: {filename} - Size: {filesize} - md5: {md5.hexdigest()} - Packets to send: {totalPackets}")
+        Logger.LogInfo(
+            f"File: {filename} - Size: {filesize} - md5: \
+            {md5.hexdigest()} - Packets to send: {totalPackets}")
         self.sendFile(file, const.CHUNKSIZE)
         Logger.LogInfo('File transfer has ended.')
 
@@ -181,12 +190,13 @@ class ServerStopAndWait:
         fileSize = len(file)
         totalPackets = fileSize / chunksize
         packetsPushed = 0
-        lastPacketSentAt = time.time()
 
         socketTimeouts = 0
-        while (packetsPushed < totalPackets and socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS):
-            sequenceNumber = (packetsPushed + 1) % 2 # starts in 1
-            payload = file[packetsPushed * chunksize : (packetsPushed + 1) * chunksize]
+        while (packetsPushed < totalPackets and socketTimeouts <
+               const.CLIENT_SOCKET_TIMEOUTS):
+            sequenceNumber = (packetsPushed + 1) % 2  # starts in 1
+            payload = file[packetsPushed *
+                           chunksize: (packetsPushed + 1) * chunksize]
             self.sendPacket(sequenceNumber, payload)
             Logger.LogDebug(f"Sent packet {sequenceNumber}")
             try:
@@ -195,28 +205,37 @@ class ServerStopAndWait:
                 Logger.LogDebug(f"Received ACK {ackNseq}")
                 socketTimeouts = 0
                 packetsPushed += 1
-                while(ackNseq != sequenceNumber and socketTimeouts < const.CLIENT_SOCKET_TIMEOUTS): # case 4
+                while (ackNseq != sequenceNumber and socketTimeouts <
+                       const.CLIENT_SOCKET_TIMEOUTS):  # case 4
                     self.sendPacket(sequenceNumber, payload)
-                    try: 
+                    try:
                         self.socket.settimeout(0.2)
                         ackNseq = self.receiveACK()
-                        Logger.LogDebug(f"Re attempted: Received ACK {ackNseq}")
+                        Logger.LogDebug(
+                            f"Re attempted: Received ACK {ackNseq}")
                         socketTimeouts = 0
-                    except TimeoutError:                
+                    except TimeoutError:
                         socketTimeouts += 1
-                        Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-                    except:
-                        Logger.LogError("There has been an error receiving the ACK")
-            except TimeoutError:                
+                        Logger.LogWarning(
+                            f"There has been a socket timeout \
+                            (number: {socketTimeouts})")
+                    except BaseException:
+                        Logger.LogError(
+                            "There has been an error receiving the ACK")
+            except TimeoutError:
                 socketTimeouts += 1
-                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-            except:
+                Logger.LogWarning(
+                    f"There has been a socket timeout \
+                    (number: {socketTimeouts})")
+            except BaseException:
                 Logger.LogError("There has been an error receiving the ACK")
 
             # Case 1: Packet received => ACK received
             # Case 2: Packet lost => timeout => do nothing (resend)
-            # Case 3: Packet received, ACK lost => timeout => do nothing (resend)
-            # Case 4: ACK not received before timeout => timeout => resend packet => receive ack1 twice (resend next packet)
+            # Case 3: Packet received, ACK lost => timeout
+            # => do nothing (resend)
+            # Case 4: ACK not received before timeout => timeout => resend
+            # packet => receive ack1 twice (resend next packet)
 
     def sendPacket(self, nseq, payload):
         opcode = bytes([const.PACKET_OPCODE])
@@ -227,48 +246,63 @@ class ServerStopAndWait:
         message = Packet.pack_package(header, payload)
         self.send(message)
 
-    def send(self, message):
-        self.socket.send(message, self.clientAddress, self.clientPort)
-
     def sendDownloadRequestResponse(self, file, md5):
         opcode = bytes([const.DOWNLOAD_REQUEST_RESPONSE_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
-        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode  + nseq, len(opcode + zeroedChecksum + nseq), 'sendDownloadRequestResponse')
+        finalChecksum = Checksum.get_checksum(zeroedChecksum +
+                                              opcode +
+                                              nseq,
+                                              len(opcode +
+                                                  zeroedChecksum +
+                                                  nseq),
+                                              'sendDownloadRequestResponse')
         fileSize = len(file).to_bytes(16, const.BYTEORDER)
 
         header = (opcode, finalChecksum, nseq)
         payload = (md5.digest(), fileSize)
         message = Packet.pack_download_response(header, payload)
 
-        Logger.LogDebug(f"Im sending a packet with opcode: {Utils.bytesToInt(opcode)} and nseq: {Utils.bytesToInt(nseq)}")
+        Logger.LogDebug(
+            f"Im sending a packet with opcode: {Utils.bytesToInt(opcode)} \
+            and nseq: {Utils.bytesToInt(nseq)}")
         Logger.LogDebug("Im waiting for the ack")
 
         nextPacketIsAnOk = False
         ackReceived = False
         socketTimeouts = 0
         receivedErrorCode = False
-        while(not ackReceived and socketTimeouts < const.LAST_ACK_PACKET_TIMEOUT and not (nextPacketIsAnOk or receivedErrorCode)): # case 4
+        while (not ackReceived and socketTimeouts <
+               const.LAST_ACK_PACKET_TIMEOUT and
+               not (nextPacketIsAnOk or receivedErrorCode)):  # case 4
             self.send(message)
-            try: 
+            try:
                 self.socket.settimeout(0.2)
                 receivedOpcode = self.receiveResponseACK()
-                Logger.LogDebug(f"Received Download Response ACK. Opcode: {receivedOpcode}")
+                Logger.LogDebug(
+                    f"Received Download Response ACK. \
+                    Opcode: {receivedOpcode}")
                 socketTimeouts = 0
                 if receivedOpcode == const.NO_DISK_SPACE_OPCODE:
                     receivedErrorCode = True
-                if receivedOpcode != const.DOWNLOAD_REQUEST_OPCODE: # If Client re-sent request (not nextPacketIsAnOk), send message again
+                # If Client re-sent request (not nextPacketIsAnOk), send
+                # message again
+                if receivedOpcode != const.DOWNLOAD_REQUEST_OPCODE:
                     nextPacketIsAnOk = True
-            except TimeoutError:                
+            except TimeoutError:
                 socketTimeouts += 1
-                Logger.LogWarning(f"There has been a socket timeout (number: {socketTimeouts})")
-            except:
-                Logger.LogError("There has been an error receiving the ACK")
+                Logger.LogWarning(
+                    f"There has been a socket timeout \
+                    (number: {socketTimeouts})")
+            except BaseException:
+                Logger.LogError("There has been an \
+                                error receiving the ACK")
 
         return receivedErrorCode
 
     def receivePacket(self):
-        received_message, (serverAddres, serverPort) = self.socket.receive(const.PACKET_SIZE)
+        received_message, (serverAddres, serverPort) = self.socket.receive(
+            const.PACKET_SIZE)
         if Utils.bytesToInt(received_message[:1]) == 0:
             header, payload = Packet.unpack_upload_request(received_message)
         else:
@@ -276,15 +310,21 @@ class ServerStopAndWait:
         return header, payload
 
     def receiveResponseACK(self):
-        received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
+        received_message, (serverAddres, serverPort) = self.socket.receive(
+            const.ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
         Logger.LogInfo(f"RECEIVED ACK. \t{header}")
         opcode = header['opcode'].to_bytes(1, const.BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
-        
-        if Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes)):
+
+        if Checksum.is_checksum_valid(checksum +
+                                      opcode +
+                                      nseqToBytes,
+                                      len(opcode +
+                                          checksum +
+                                          nseqToBytes)):
             return header['opcode']
         else:
             Logger.LogWarning("Invalid checksum for ACK received")
@@ -300,7 +340,8 @@ class ServerStopAndWait:
         self.send(message)
 
     def receiveACK(self):
-        received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
+        received_message, (serverAddres, serverPort) = self.socket.receive(
+            const.ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
         Logger.LogInfo(f"RECEIVED ACK. \t{header}")
@@ -311,8 +352,13 @@ class ServerStopAndWait:
         if header['opcode'] == const.FILE_TOO_BIG_OPCODE:
             Logger.LogError("File too big")
             return const.ERROR_CODE
-
-        if Checksum.is_checksum_valid(checksum + opcode + nseqToBytes, len(opcode + checksum + nseqToBytes)):
+        
+        if Checksum.is_checksum_valid(checksum +
+                                      opcode +
+                                      nseqToBytes,
+                                      len(opcode +
+                                          checksum +
+                                          nseqToBytes)):
             return header['nseq']
         else:
             Logger.LogWarning("Invalid checksum for ACK receeived")
@@ -334,13 +380,21 @@ class ServerStopAndWait:
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
 
-        return Checksum.is_checksum_valid(checksum + opcode + nseqToBytes + payload, len(opcode + checksum + nseqToBytes + payload))
+        return Checksum.is_checksum_valid(checksum +
+                                          opcode +
+                                          nseqToBytes +
+                                          payload, len(opcode +
+                                                       checksum +
+                                                       nseqToBytes +
+                                                       payload))
 
     def stopFileTransfer(self, nseq, fileName, md5, state):
         opcode = bytes([const.STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, const.BYTEORDER)
-        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseqToBytes, len(opcode + zeroedChecksum + nseqToBytes), 'sendACK')
+        finalChecksum = Checksum.get_checksum(
+            zeroedChecksum + opcode + nseqToBytes, len(
+                opcode + zeroedChecksum + nseqToBytes), 'sendACK')
         header = (opcode, finalChecksum, nseqToBytes)
         payload = (md5.digest(), state)
         message = Packet.pack_stop_file_transfer(header, payload)
@@ -351,17 +405,26 @@ class ServerStopAndWait:
         communicationFinished = False
         stopCommunicationSocketTimeout = 0
 
-        while (not communicationFinished) and (stopCommunicationSocketTimeout < const.LAST_ACK_PACKET_TIMEOUT):
-           try:
-               self.socket.settimeout(0.2)
-               received_message, (serverAddres, serverPort) = self.socket.receive(const.ACK_SIZE)
-               stopCommunicationSocketTimeout = 0
-               communicationFinished = True
-           except TimeoutError:
-               # We assume the client has already sent the ACK and closed the connection
-               stopCommunicationSocketTimeout += 1
+        while (not communicationFinished) and (
+                stopCommunicationSocketTimeout <
+                const.LAST_ACK_PACKET_TIMEOUT
+                ):
+            try:
+                self.socket.settimeout(0.2)
+                received_message, (serverAddres, serverPort) =\
+                    self.socket.receive(const.ACK_SIZE)
+                stopCommunicationSocketTimeout = 0
+                communicationFinished = True
+            except TimeoutError:
+                # We assume the client has already sent the ACK and closed the
+                # connection
+                stopCommunicationSocketTimeout += 1
 
-           if (not communicationFinished) and (time.time() - stopFileTransferMsgSentAt > const.SELECTIVE_REPEAT_PACKET_TIMEOUT):
+            if (not communicationFinished) and (time.time() -
+                                                stopFileTransferMsgSentAt >
+                                                const.
+                                                SELECTIVE_REPEAT_PACKET_TIMEOUT
+                                                ):
                 self.send(message)
                 stopFileTransferMsgSentAt = time.time()
 
@@ -369,27 +432,38 @@ class ServerStopAndWait:
         communicationFinished = False
         stopCommunicationSocketTimeout = 0
 
-        while (not communicationFinished) and (stopCommunicationSocketTimeout < const.LAST_ACK_PACKET_TIMEOUT):
-           try:
-               self.socket.settimeout(0.2)
-               received_message, (serverAddres, serverPort) = self.socket.receive(const.STOP_FILE_TRANSFER_SIZE)
-               stopCommunicationSocketTimeout = 0
-               communicationFinished = True
-           except TimeoutError:
-               # We assume the client closed the connection
-               stopCommunicationSocketTimeout += 1
+        while (not communicationFinished) and (
+                stopCommunicationSocketTimeout <
+                const.LAST_ACK_PACKET_TIMEOUT):
+            try:
+                self.socket.settimeout(0.2)
+                received_message, (serverAddres, serverPort) \
+                    = self.socket.receive(
+                    const.STOP_FILE_TRANSFER_SIZE)
+                stopCommunicationSocketTimeout = 0
+                communicationFinished = True
+            except TimeoutError:
+                # We assume the client closed the connection
+                stopCommunicationSocketTimeout += 1
 
         header, payload = Packet.unpack_stop_file_transfer(received_message)
         Logger.LogInfo(f"Received ACK: {header['nseq']}")
         if payload["state"] == 0:
             Logger.LogError(
-                "The client has reported an error downloading the file. File received is corrupted.")
-    
+                "The client has reported an error downloading \
+                the file. File received is corrupted.")
+
     def sendFileDoesNotExistError(self):
         opcode = bytes([const.FILE_DOES_NOT_EXIST_OPCODE])
         zeroedChecksum = (0).to_bytes(4, const.BYTEORDER)
         nseq = (0).to_bytes(4, const.BYTEORDER)
-        finalChecksum = Checksum.get_checksum(zeroedChecksum + opcode + nseq, len(opcode + zeroedChecksum + nseq), 'sendACK')
+        finalChecksum = Checksum.get_checksum(zeroedChecksum +
+                                              opcode +
+                                              nseq,
+                                              len(opcode +
+                                                  zeroedChecksum +
+                                                  nseq),
+                                              'sendACK')
         header = (opcode, finalChecksum, nseq)
 
         message = Packet.pack_file_does_not_exist_error(header)
