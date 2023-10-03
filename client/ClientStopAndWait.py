@@ -262,7 +262,7 @@ class ClientStopAndWait:
                     while (errorTimeouts < const.LAST_ACK_PACKET_TIMEOUT
                            and not receivedErrorACK):
                         try:
-                            self.socket.settimeout(TIMEOUT)
+                            self.socket.settimeout(const.TIMEOUT)
                             ackNseq = self.receiveACK()
                             Logger.LogDebug(f"Received ACK {ackNseq}")
                             errorTimeouts = 0
