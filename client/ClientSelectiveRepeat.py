@@ -244,7 +244,7 @@ class ClientSelectiveRepeat:
         Logger.LogDebug("Waiting for stop file transfer message")
         received_message, (serverAddres, serverPort) = self.socket.receive(
             STOP_FILE_TRANSFER_SIZE)
-
+        Logger.LogDebug("RECEIVED STOP FILE TRANSFER MESSAGE")
         header, payload = Packet.unpack_stop_file_transfer(received_message)
 
         if payload["state"] == 0:
@@ -261,7 +261,6 @@ class ClientSelectiveRepeat:
         header = (opcode, finalChecksum, nseqToBytes)
 
         message = Packet.pack_ack(header)
-
         self.send(message)
 
         print('Finalized uploading file')

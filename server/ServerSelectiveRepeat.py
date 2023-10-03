@@ -11,7 +11,7 @@ from common.constants import SELECTIVE_REPEAT, \
     NO_DISK_SPACE_OPCODE, ACK_SIZE, PACKET_SIZE, ACK_OPCODE, \
     STOP_FILE_TRANSFER_OPCODE, STATE_OK, STATE_ERROR, \
     FILE_DOES_NOT_EXIST_OPCODE, LAST_ACK_PACKET_TIMEOUT, \
-    STOP_FILE_TRANSFER_SIZE, TIMEOUT
+    STOP_FILE_TRANSFER_SIZE, TIMEOUT, FINAL_ACK_OPCODE
 from common.Logger import Logger
 from common.Checksum import Checksum
 
@@ -127,7 +127,7 @@ class ServerSelectiveRepeat:
 
             self.saveFile(file, fileName)
 
-            self.stopFileTransfer(totalPackets + 1, fileName, originalMd5)
+            self.stopFileTransfer(totalPackets + 1, fileName, originalMd5, totalPackets)
 
             Logger.LogInfo("Finalizing uploading file")
 
@@ -383,7 +383,7 @@ class ServerSelectiveRepeat:
             checksum + opcode + nseqToBytes,
             len(opcode + checksum + nseqToBytes))
 
-    def stopFileTransfer(self, nseq, fileName, originalMd5):
+    def stopFileTransfer(self, nseq, fileName, originalMd5, totalPackets):
         opcode = bytes([STOP_FILE_TRANSFER_OPCODE])
         zeroedChecksum = (0).to_bytes(4, BYTEORDER)
         nseqToBytes = nseq.to_bytes(4, BYTEORDER)
@@ -422,9 +422,18 @@ class ServerSelectiveRepeat:
             try:
                 self.socket.settimeout(TIMEOUT)
                 received_message, (serverAddres,
-                                   serverPort) = self.socket.receive(ACK_SIZE)
-                stopCommunicationSocketTimeout = 0
-                communicationFinished = True
+                                   serverPort) = self.socket.receive(PACKET_SIZE)
+                if Utils.bytesToInt(
+                    received_message[:1]) == FINAL_ACK_OPCODE:
+                    header = Packet.unpack_ack(received_message)
+                    finalAckNseq = totalPackets + 1
+                    if header['nseq'] == finalAckNseq:
+                        stopCommunicationSocketTimeout = 0
+                        communicationFinished = True
+                else:
+                    header, payload = Packet.unpack_package(received_message)
+                    self.sendACK(header['nseq'])
+                
             except TimeoutError:
                 # Acá se da por sentado que el cliente se cerró
                 stopCommunicationSocketTimeout += 1
