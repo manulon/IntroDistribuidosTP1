@@ -339,6 +339,7 @@ class ClientStopAndWait:
         nextNseq = 1
         firstIteration = True
         # enviar ok al servidor para que arranque la descarga
+        self.socket.settimeout(None)
         while acksSent < totalPackets:
             if not firstIteration:
                 header, payload = self.receivePacket()
@@ -400,6 +401,7 @@ class ClientStopAndWait:
     def receiveDownloadResponse(self):
         socketTimeouts = 0
         receivedResponse = False
+        received_message = None
         while socketTimeouts < \
                 const.CLIENT_SOCKET_TIMEOUTS \
                 and not receivedResponse:
