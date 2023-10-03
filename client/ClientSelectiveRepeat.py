@@ -367,6 +367,7 @@ class ClientSelectiveRepeat:
 
             while distinctAcksSent != totalPackets:
                 if not firstIteration:
+                    self.socket.settimeout(None)
                     header, payload = self.receivePacket()
                 else:
                     firstIteration = False

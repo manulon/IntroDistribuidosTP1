@@ -107,6 +107,7 @@ class ServerSelectiveRepeat:
 
             while distinctAcksSent != totalPackets:
                 if not firstIteration:
+                    self.socket.settimeout(None)
                     header, payload = self.receivePackage()
                 else:
                     firstIteration = False
