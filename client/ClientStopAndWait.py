@@ -48,7 +48,7 @@ class ClientStopAndWait:
                 not communicationStarted) and (
                 initCommunicationSocketTimeout < const.CLIENT_SOCKET_TIMEOUTS):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 chunksize = self.receiveFileTransferTypeResponse()
                 initCommunicationSocketTimeout = 0
                 communicationStarted = True
@@ -150,7 +150,7 @@ class ClientStopAndWait:
             self.sendPacket(sequenceNumber, payload)
             Logger.LogDebug(f"Sent packet {sequenceNumber}")
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 ackNseq = self.receiveACK()
                 Logger.LogDebug(f"Received ACK {ackNseq}")
                 socketTimeouts = 0
@@ -159,7 +159,7 @@ class ClientStopAndWait:
                        const.CLIENT_SOCKET_TIMEOUTS):  # case 4
                     self.sendPacket(sequenceNumber, payload)
                     try:
-                        self.socket.settimeout(0.2)
+                        self.socket.settimeout(const.TIMEOUT)
                         ackNseq = self.receiveACK()
                         Logger.LogDebug(
                             f"Re attempted: Received ACK {ackNseq}")
@@ -247,7 +247,7 @@ class ClientStopAndWait:
                 not communicationStarted) and (
                 initCommunicationSocketTimeout < const.CLIENT_SOCKET_TIMEOUTS):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 opcode, fileSize, md5 = self.receiveDownloadResponse()
                 initCommunicationSocketTimeout = 0
                 communicationStarted = True
@@ -262,7 +262,7 @@ class ClientStopAndWait:
                     while (errorTimeouts < const.LAST_ACK_PACKET_TIMEOUT
                            and not receivedErrorACK):
                         try:
-                            self.socket.settimeout(0.2)
+                            self.socket.settimeout(TIMEOUT)
                             ackNseq = self.receiveACK()
                             Logger.LogDebug(f"Received ACK {ackNseq}")
                             errorTimeouts = 0
@@ -317,7 +317,7 @@ class ClientStopAndWait:
             sendConnectionACKSocketTimeout
                 < const.CLIENT_SOCKET_TIMEOUTS):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 header, payload = self.receivePacket()
                 firstPacketArrived = True
                 sendConnectionACKSocketTimeout = 0
@@ -406,7 +406,7 @@ class ClientStopAndWait:
                 const.CLIENT_SOCKET_TIMEOUTS \
                 and not receivedResponse:
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 received_message, \
                     (udpServerThreadAddress,
                      udpServerThreadPort)\

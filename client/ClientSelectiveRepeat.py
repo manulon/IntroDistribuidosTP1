@@ -12,7 +12,7 @@ from common.constants import CHUNKSIZE, CLIENT_SOCKET_TIMEOUTS, \
     FILE_TRANSFER_TYPE_RESPONSE_SIZE, NO_DISK_SPACE_OPCODE, STATE_OK, \
     STATE_ERROR, STOP_FILE_TRANSFER_OPCODE, INIT_DOWNLOAD_ACK_OPCODE, \
     ACK_OPCODE, PACKET_SIZE, DOWNLOAD_RESPONSE_SIZE, \
-    STOP_FILE_TRANSFER_SIZE, PACKET_OPCODE, ACK_SIZE, FINAL_ACK_OPCODE
+    STOP_FILE_TRANSFER_SIZE, PACKET_OPCODE, ACK_SIZE, FINAL_ACK_OPCODE, TIMEOUT
 
 
 class ClientSelectiveRepeat:
@@ -63,7 +63,7 @@ class ClientSelectiveRepeat:
                     not communicationStarted) and (
                     initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(TIMEOUT)
                     receivedMessageHeader, receivedMessagePayload = \
                         self.receiveFileTransferTypeResponse()
                     if (receivedMessageHeader['opcode']) == 13:
@@ -124,7 +124,7 @@ class ClientSelectiveRepeat:
                         ackReceived = None
 
                         try:
-                            self.socket.settimeout(0.2)
+                            self.socket.settimeout(TIMEOUT)
                             ackReceived = self.receiveACK()
                             socketTimeouts = 0
                         except TimeoutError:
@@ -294,7 +294,7 @@ class ClientSelectiveRepeat:
                 not communicationStarted) and (
                 initCommunicationSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(TIMEOUT)
                 receivedMessageHeader, receivedMessagePayload \
                     = self.receiveDownloadResponse()
                 if (receivedMessageHeader['opcode']) == 12:
@@ -343,7 +343,7 @@ class ClientSelectiveRepeat:
                     not firstPacketArrived) and (
                     sendConnectionACKSocketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(TIMEOUT)
                     header, header = self.receivePacket()
                     sendConnectionACKSocketTimeout = 0
                     firstPacketArrived = True

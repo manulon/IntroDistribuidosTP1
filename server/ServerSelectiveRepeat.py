@@ -11,7 +11,7 @@ from common.constants import SELECTIVE_REPEAT, \
     NO_DISK_SPACE_OPCODE, ACK_SIZE, PACKET_SIZE, ACK_OPCODE, \
     STOP_FILE_TRANSFER_OPCODE, STATE_OK, STATE_ERROR, \
     FILE_DOES_NOT_EXIST_OPCODE, LAST_ACK_PACKET_TIMEOUT, \
-    STOP_FILE_TRANSFER_SIZE
+    STOP_FILE_TRANSFER_SIZE, TIMEOUT
 from common.Logger import Logger
 from common.Checksum import Checksum
 
@@ -71,7 +71,7 @@ class ServerSelectiveRepeat:
                     not noDiskSpacePacketACKed) and (
                     noDiskSpacePacketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(TIMEOUT)
                     nseq = self.receiveACK()
                     if nseq == 0:
                         noDiskSpacePacketTimeout = 0
@@ -191,7 +191,7 @@ class ServerSelectiveRepeat:
                     ackReceived = None
 
                     try:
-                        self.socket.settimeout(0.2)
+                        self.socket.settimeout(TIMEOUT)
                         ackReceived = self.receiveACK()
                         socketTimeouts = 0
                     except TimeoutError:
@@ -237,7 +237,7 @@ class ServerSelectiveRepeat:
                     not fileNotExistPacketACKed) and (
                     fileNotExistPacketTimeout < CLIENT_SOCKET_TIMEOUTS):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(TIMEOUT)
                     nseq = self.receiveACK()
                     if nseq == 0:
                         fileNotExistPacketTimeout = 0
@@ -418,7 +418,7 @@ class ServerSelectiveRepeat:
                 not communicationFinished) and (
                 stopCommunicationSocketTimeout < LAST_ACK_PACKET_TIMEOUT):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(TIMEOUT)
                 received_message, (serverAddres,
                                    serverPort) = self.socket.receive(ACK_SIZE)
                 stopCommunicationSocketTimeout = 0
@@ -443,7 +443,7 @@ class ServerSelectiveRepeat:
                 not communicationFinished) and (
                 stopCommunicationSocketTimeout < LAST_ACK_PACKET_TIMEOUT):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(TIMEOUT)
                 received_message, (serverAddres, serverPort) \
                     = self.socket.receive(STOP_FILE_TRANSFER_SIZE)
                 stopCommunicationSocketTimeout = 0

@@ -30,7 +30,7 @@ class ServerStopAndWait:
                 not errorReceived
             ):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(const.TIMEOUT)
                     ackNseq = self.receiveACK()
                     Logger.LogDebug(f"Received ACK {ackNseq}")
                     socketTimeouts = 0
@@ -56,7 +56,7 @@ class ServerStopAndWait:
                 not errorReceived
             ):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(const.TIMEOUT)
                     ackNseq = self.receiveACK()
                     Logger.LogDebug(f"Received ACK {ackNseq}")
                     socketTimeouts = 0
@@ -178,7 +178,7 @@ class ServerStopAndWait:
                 not errorReceived
             ):
                 try:
-                    self.socket.settimeout(0.2)
+                    self.socket.settimeout(const.TIMEOUT)
                     ackNseq = self.receiveACK()
                     Logger.LogDebug(f"Received ACK {ackNseq}")
                     socketTimeouts = 0
@@ -224,7 +224,7 @@ class ServerStopAndWait:
             self.sendPacket(sequenceNumber, payload)
             Logger.LogDebug(f"Sent packet {sequenceNumber}")
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 ackNseq = self.receiveACK()
                 Logger.LogDebug(f"Received ACK {ackNseq}")
                 socketTimeouts = 0
@@ -233,7 +233,7 @@ class ServerStopAndWait:
                        const.CLIENT_SOCKET_TIMEOUTS):  # case 4
                     self.sendPacket(sequenceNumber, payload)
                     try:
-                        self.socket.settimeout(0.2)
+                        self.socket.settimeout(const.TIMEOUT)
                         ackNseq = self.receiveACK()
                         Logger.LogDebug(
                             f"Re attempted: Received ACK {ackNseq}")
@@ -301,7 +301,7 @@ class ServerStopAndWait:
                not (nextPacketIsAnOk or receivedErrorCode)):  # case 4
             self.send(message)
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 receivedOpcode = self.receiveResponseACK()
                 Logger.LogDebug(
                     f"Received Download Response ACK. \
@@ -434,7 +434,7 @@ class ServerStopAndWait:
                 const.LAST_ACK_PACKET_TIMEOUT
                 ):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 received_message, (serverAddres, serverPort) =\
                     self.socket.receive(const.ACK_SIZE)
                 stopCommunicationSocketTimeout = 0
@@ -460,7 +460,7 @@ class ServerStopAndWait:
                 stopCommunicationSocketTimeout <
                 const.LAST_ACK_PACKET_TIMEOUT):
             try:
-                self.socket.settimeout(0.2)
+                self.socket.settimeout(const.TIMEOUT)
                 received_message, (serverAddres, serverPort) \
                     = self.socket.receive(
                     const.STOP_FILE_TRANSFER_SIZE)
