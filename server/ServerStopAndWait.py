@@ -32,7 +32,6 @@ class ServerStopAndWait:
                 try:
                     self.socket.settimeout(const.TIMEOUT)
                     ackNseq = self.receiveACK()
-                    Logger.LogDebug(f"Received ACK {ackNseq}")
                     socketTimeouts = 0
                     errorReceived = True
                 except TimeoutError:
@@ -58,7 +57,6 @@ class ServerStopAndWait:
                 try:
                     self.socket.settimeout(const.TIMEOUT)
                     ackNseq = self.receiveACK()
-                    Logger.LogDebug(f"Received ACK {ackNseq}")
                     socketTimeouts = 0
                     errorReceived = True
                 except TimeoutError:
@@ -145,7 +143,7 @@ class ServerStopAndWait:
             else:  # client resends packet - cases 3 (lost ACK) and 4 (timeout)
                 # server only resends ACK (detects duplicate)
                 self.sendACK(header['nseq'])
-                Logger.LogDebug(f"RE-Sent ACK {header['nseq']}")
+                Logger.LogDebug(f"Sending ACK {header['nseq']}")
 
         bytesInLatestPacket = fileSize % const.CHUNKSIZE
         Logger.LogWarning(
@@ -160,7 +158,6 @@ class ServerStopAndWait:
         self.stopFileTransfer(nextNseq, fileName, md5, state)
 
     def download(self, filename):
-
         filename = filename.rstrip('\x00')
         file: bytes
         completeName = os.path.join(self.storage, filename)
@@ -180,17 +177,18 @@ class ServerStopAndWait:
                 try:
                     self.socket.settimeout(const.TIMEOUT)
                     ackNseq = self.receiveACK()
-                    Logger.LogDebug(f"Received ACK {ackNseq}")
+                    Logger.LogDebug(f"Received ACK with nseq: {ackNseq}")
                     socketTimeouts = 0
                     errorReceived = True
                 except TimeoutError:
-                    Logger.LogWarning("There has been an ACK timeout \
-                                       for an error")
                     socketTimeouts += 1
                 if (not errorReceived) and (
                     time.time() - errorPacketSentTime
                     > const.SELECTIVE_REPEAT_PACKET_TIMEOUT
                 ):
+                    Logger.LogWarning(
+                        f"There has been a timeout in Sending \
+                        file does not exist error packet. Retransmiting packet")
                     self.sendFileDoesNotExistError()
                     errorPacketSentTime = time.time()
             return
@@ -223,12 +221,12 @@ class ServerStopAndWait:
             payload = file[packetsPushed *
                            chunksize: (packetsPushed + 1) * chunksize]
             self.sendPacket(sequenceNumber, payload)
+            Logger.LogDebug(f"Sending packet with nseq: {sequenceNumber}")
             packetSentTime = time.time()
-            Logger.LogDebug(f"Sent packet {sequenceNumber}")
             try:
                 self.socket.settimeout(const.TIMEOUT)
                 ackNseq = self.receiveACK()
-                Logger.LogDebug(f"Received ACK {ackNseq}")
+                Logger.LogDebug(f"Received ACK with nseq: {ackNseq}")
                 socketTimeouts = 0
                 packetsPushed += 1
                 while (ackNseq != sequenceNumber and socketTimeouts <
@@ -237,28 +235,24 @@ class ServerStopAndWait:
                     try:
                         self.socket.settimeout(const.TIMEOUT)
                         ackNseq = self.receiveACK()
-                        Logger.LogDebug(
-                            f"Re attempted: Received ACK {ackNseq}")
+                        Logger.LogDebug(f"Received ACK with nseq: {ackNseq}")
                         socketTimeouts = 0
                     except TimeoutError:
                         socketTimeouts += 1
-                        Logger.LogWarning(
-                            f"There has been a socket timeout \
-                            (number: {socketTimeouts})")
                     except BaseException:
                         Logger.LogError(
                             "There has been an error receiving the ACK")
             except TimeoutError:
                 socketTimeouts += 1
-                Logger.LogWarning(
-                    f"There has been a socket timeout \
-                    (number: {socketTimeouts})")
             except BaseException:
                 Logger.LogError("There has been an error receiving the ACK")
             if (ackNseq != sequenceNumber) and (
                     time.time() - packetSentTime
                     > const.SELECTIVE_REPEAT_PACKET_TIMEOUT
                 ):
+                    Logger.LogWarning(
+                        f"There has been a timeout in Sending \
+                        the packet with nseq {sequenceNumber}. Retransmiting packet")
                     self.sendPacket(sequenceNumber, payload)
                     packetSentTime = time.time()
 
@@ -295,11 +289,6 @@ class ServerStopAndWait:
         payload = (md5.digest(), fileSize)
         message = Packet.pack_download_response(header, payload)
 
-        Logger.LogDebug(
-            f"Im sending a packet with opcode: {Utils.bytesToInt(opcode)} \
-            and nseq: {Utils.bytesToInt(nseq)}")
-        Logger.LogDebug("Im waiting for the ack")
-
         nextPacketIsAnOk = False
         ackReceived = False
         socketTimeouts = 0
@@ -311,9 +300,6 @@ class ServerStopAndWait:
             try:
                 self.socket.settimeout(const.TIMEOUT)
                 receivedOpcode = self.receiveResponseACK()
-                Logger.LogDebug(
-                    f"Received Download Response ACK. \
-                    Opcode: {receivedOpcode}")
                 socketTimeouts = 0
                 if receivedOpcode == const.NO_DISK_SPACE_OPCODE:
                     receivedErrorCode = True
@@ -323,9 +309,6 @@ class ServerStopAndWait:
                     nextPacketIsAnOk = True
             except TimeoutError:
                 socketTimeouts += 1
-                Logger.LogWarning(
-                    f"There has been a socket timeout \
-                    (number: {socketTimeouts})")
             except BaseException:
                 Logger.LogError("There has been an \
                                 error receiving the ACK")
@@ -346,7 +329,6 @@ class ServerStopAndWait:
             const.ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
-        Logger.LogInfo(f"RECEIVED ACK. \t{header}")
         opcode = header['opcode'].to_bytes(1, const.BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
@@ -376,7 +358,6 @@ class ServerStopAndWait:
             const.ACK_SIZE)
 
         header = Packet.unpack_ack(received_message)
-        Logger.LogInfo(f"RECEIVED ACK. \t{header}")
         opcode = header['opcode'].to_bytes(1, const.BYTEORDER)
         checksum = (header['checksum']).to_bytes(4, const.BYTEORDER)
         nseqToBytes = header['nseq'].to_bytes(4, const.BYTEORDER)
@@ -457,6 +438,9 @@ class ServerStopAndWait:
                                                 const.
                                                 SELECTIVE_REPEAT_PACKET_TIMEOUT
                                                 ):
+                Logger.LogWarning(
+                    f"There has been a timeout in Sending \
+                    stop file transfer packet. Retransmiting packet")
                 self.send(message)
                 stopFileTransferMsgSentAt = time.time()
 
@@ -526,4 +510,5 @@ class ServerStopAndWait:
         return md5, state
 
     def closeSocket(self):
+        Logger.LogSuccess(f"The transaction with {self.clientAddress}:{self.clientPort} is finished.")
         self.socket.close()
